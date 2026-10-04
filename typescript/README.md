@@ -12,7 +12,8 @@ const result = await verifyEndpoint('https://host/v1', {
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys: { [kid]: jwk },
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'cc-chat.adverserial.ai'
+	audience: 'cc-chat.adverserial.ai',
+	verifyHardwareEvidence: verifyWithPinnedDcapQvl
 });
 if (result.status === 'verified' && !result.proof.devMode) { /* … */ }
 
@@ -20,6 +21,8 @@ const client = await createVerifiedOpenAI({ baseURL: 'https://host/v1', apiKey: 
 // client.fetchImpl injects Authorization and refuses to send when
 // verification failed (throws VerificationRequiredError).
 ```
+
+**Hardware-verifier requirement:** `verifyHardwareEvidence` is mandatory. It must validate the raw TDX quote, event log, certificate/HPKE binding, and applicable GPU evidence against a pinned public policy. The SDK fails closed when this verifier is absent or rejects the evidence. A proxy receipt alone is not a hardware proof.
 
 **TLS pinning limitation:** neither browser fetch nor Node fetch expose the
 peer certificate, so the evidence's `tls_spki_sha256` cannot be enforced on

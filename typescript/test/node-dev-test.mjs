@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PROXY_DIR = path.resolve(HERE, '../../../attest-proxy');
+const PROXY_DIR = path.resolve(HERE, '../../../public-attest-proxy');
 const TMP_DIR = path.join(HERE, '.tmp');
 const BIN = path.join(TMP_DIR, process.platform === 'win32' ? 'attest-proxy.exe' : 'attest-proxy');
 
@@ -95,7 +95,8 @@ try {
 			ENDPOINT: base,
 			MODEL_ID: MODEL,
 			RECEIPT_ISSUER: ISSUER,
-			RECEIPT_AUDIENCE: AUDIENCE
+			RECEIPT_AUDIENCE: AUDIENCE,
+		AUTH_REQUIRED: '0'
 		},
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
@@ -118,7 +119,8 @@ try {
 		trustedReceiptKeys,
 		issuer: ISSUER,
 		audience: AUDIENCE,
-		expectedEndpoint: base
+		expectedEndpoint: base,
+		verifyHardwareEvidence: async () => ({ verified: true, verifier: 'test-synthetic-evidence' })
 	};
 
 	// 1. Happy path against the real proxy.

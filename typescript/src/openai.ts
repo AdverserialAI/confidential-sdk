@@ -16,7 +16,7 @@
  */
 
 import { verifyEndpoint } from './verify.js';
-import type { TrustedReceiptKeys, VerifiedProof } from './verify.js';
+import type { HardwareEvidenceVerifier, TrustedReceiptKeys, VerifiedProof } from './verify.js';
 
 export type VerifiedOpenAIOptions = {
 	/** Endpoint base URL, e.g. "https://host/v1". */
@@ -31,6 +31,7 @@ export type VerifiedOpenAIOptions = {
 	expectedModelDigest?: string;
 	expectedRuntimeDigest?: string;
 	attestationUrl?: string;
+	verifyHardwareEvidence: HardwareEvidenceVerifier;
 	fetchImpl?: typeof fetch;
 };
 

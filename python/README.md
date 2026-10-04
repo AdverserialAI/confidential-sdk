@@ -13,6 +13,7 @@ proof = verify_endpoint(
     trusted_receipt_keys={kid: jwk},
     issuer="https://verify.adverserial.ai",
     audience="cc-chat.adverserial.ai",
+    hardware_verifier=verify_hardware_evidence,
 )
 session = VerifiedSession("https://host/v1", proof=proof, api_key="sk-...")
 resp = session.chat_completions(messages=[{"role": "user", "content": "hi"}])
@@ -23,6 +24,16 @@ resp = session.chat_completions(messages=[{"role": "user", "content": "hi"}])
   certificate raises `TLSPinMismatchError` before any request bytes are sent.
 - `proof.dev_mode == True` means synthetic evidence: plumbing, not hardware.
 - CLI: `python -m adverserial verify …` → see `--help`.
+
+## Hardware evidence is mandatory
+
+`hardware_verifier` is required. It must independently verify the raw TEE and
+GPU evidence against your pinned policy; the endpoint's signed receipt is not
+hardware proof by itself. The callback makes the SDK model- and GPU-agnostic:
+it receives `(evidence, nonce, expected_model_id, expected_endpoint)` and must
+return `HardwareVerification(verified=True, verifier="...")`. Deployments
+should provide a reviewed vendor-verifier adapter, such as a DCAP-QVL/TDX
+verifier paired with the applicable GPU-attestation verifier.
 
 ## Per-request receipts (WP-7)
 

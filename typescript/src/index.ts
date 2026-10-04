@@ -5,7 +5,9 @@ export type {
 	TrustedReceiptKeys,
 	VerificationResult,
 	VerifiedProof,
-	VerifyEndpointOptions
+	VerifyEndpointOptions,
+	HardwareEvidenceVerifier,
+	HardwareVerification
 } from './verify.js';
 export { createVerifiedOpenAI, VerificationRequiredError } from './openai.js';
 export type { VerifiedOpenAI, VerifiedOpenAIOptions } from './openai.js';

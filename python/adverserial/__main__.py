@@ -91,6 +91,17 @@ def _print_proof(proof: VerifiedProof) -> None:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
+    print(
+        "error: the CLI cannot verify raw TEE/GPU evidence without a configured "
+        "independent hardware verifier. Use the SDK with hardware_verifier=...; "
+        "it will not claim a hardware-verified result from a proxy receipt alone.",
+        file=sys.stderr,
+    )
+    return 2
+
+    # Retained below as the implementation skeleton for a future explicit,
+    # audited verifier adapter. Do not make this path reachable until one is
+    # configured; allowing it would create a misleading verification result.
     if args.trust_evidence_key:
         from .verify import _attestation_url_for
 

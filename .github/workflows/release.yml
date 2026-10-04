@@ -1,0 +1,28 @@
+name: Signed SDK release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: typescript/package-lock.json}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci && npm run build && npm test
+        working-directory: typescript
+      - run: pip install build && python -m build
+        working-directory: python
+      - run: tar -czf adverserial-confidential-sdk-${{ github.ref_name }}.tgz python/dist typescript/dist LICENSE README.md
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: adverserial-confidential-sdk-${{ github.ref_name }}.tgz
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: adverserial-confidential-sdk-${{ github.ref_name }}.tgz

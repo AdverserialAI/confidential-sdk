@@ -37,13 +37,38 @@ from ._canonjson import evidence_digest as canonical_evidence_digest
 from ._jws import b64url_encode, jwk_thumbprint, parse_compact_jws, verify_es256
 from ._tls import TLSPinMismatchError, attestation_ssl_context, spki_sha256_from_cert_der
 
-__all__ = ["VerifiedProof", "VerificationError", "verify_endpoint"]
+__all__ = [
+    "HardwareEvidenceVerifier",
+    "HardwareVerification",
+    "VerifiedProof",
+    "VerificationError",
+    "verify_endpoint",
+]
 
 _FUTURE_IAT_LEEWAY_SECONDS = 60
 
 
 class VerificationError(Exception):
     """The endpoint's attestation could not be verified."""
+
+
+@dataclass(frozen=True)
+class HardwareVerification:
+    """A successful independent verification of raw enclave evidence.
+
+    The SDK deliberately does not implement a pretend hardware verifier. The
+    caller supplies one backed by the selected platform's vendor verifier
+    (for example, a reviewed DCAP-QVL / TDX verifier plus GPU-attestation
+    verifier) and pins its trust policy out of band.
+    """
+
+    verified: bool
+    verifier: str
+    tee: Optional[str] = None
+    gpu: Optional[str] = None
+
+
+HardwareEvidenceVerifier = Callable[[Mapping[str, Any], str, str, Optional[str]], HardwareVerification]
 
 
 @dataclass(frozen=True)
@@ -73,6 +98,8 @@ class VerifiedProof:
     # the attestation receipt's kid). VerifiedSession uses it to verify WP-7
     # per-request receipts.
     receipt_jwk: Optional[Dict[str, Any]] = None
+    # Name/version of the independent verifier that accepted raw evidence.
+    hardware_verifier: Optional[str] = None
 
 
 def _iso(epoch: int) -> str:
@@ -149,6 +176,7 @@ def verify_endpoint(
     expected_endpoint: Optional[str] = None,
     expected_model_digest: Optional[str] = None,
     expected_runtime_digest: Optional[str] = None,
+    hardware_verifier: Optional[HardwareEvidenceVerifier] = None,
     attestation_url: Optional[str] = None,
     timeout: float = 15.0,
     now: Optional[Callable[[], float]] = None,
@@ -157,7 +185,9 @@ def verify_endpoint(
 
     Raises VerificationError (or its subclass TLSPinMismatchError) on any
     failure. `trusted_receipt_keys` maps receipt key IDs (the JWS header kid)
-    to pinned public JWKs.
+    to pinned public JWKs. `hardware_verifier` is required and must validate
+    the raw TEE/GPU evidence independently; a proxy-issued receipt alone is
+    never hardware proof.
     """
     url = attestation_url or _attestation_url_for(base_url)
     nonce = b64url_encode(secrets.token_bytes(32))
@@ -263,6 +293,21 @@ def verify_endpoint(
             f"attested SPKI: observed {observed_spki!r}, evidence claims {tls_spki!r}"
         )
 
+    # A receipt is only a signed statement by the proxy. Require an
+    # independent verifier for the raw quote/evidence before returning a
+    # proof marked verified. This is deliberately injected so the SDK can
+    # support different TEE and GPU vendors without hard-coding a provider.
+    if hardware_verifier is None:
+        raise VerificationError(
+            "an independent hardware_verifier is required; proxy receipts alone are not hardware proof"
+        )
+    try:
+        hardware = hardware_verifier(evidence, nonce, expected_model_id, expected_endpoint)
+    except Exception as exc:
+        raise VerificationError("the independent hardware verifier failed") from exc
+    if not isinstance(hardware, HardwareVerification) or not hardware.verified or not hardware.verifier:
+        raise VerificationError("the independent hardware verifier did not accept the evidence")
+
     receipt_digest = canonical_evidence_digest(receipt)
     workload = evidence.get("workload") if isinstance(evidence.get("workload"), dict) else {}
     return VerifiedProof(
@@ -286,4 +331,5 @@ def verify_endpoint(
         policy_id=workload.get("policy_id") if isinstance(workload.get("policy_id"), str) else None,
         compose_digest=workload.get("compose_digest") if isinstance(workload.get("compose_digest"), str) else None,
         receipt_jwk=receipt_jwk,
+        hardware_verifier=hardware.verifier,
     )

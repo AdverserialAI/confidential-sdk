@@ -22,6 +22,27 @@ import type { JsonRecord } from './canonjson.js';
 
 export type TrustedReceiptKeys = Record<string, JsonWebKey>;
 
+/** Result produced by an independent TDX/GPU evidence verifier. */
+export type HardwareVerification = {
+	verified: true;
+	/** Stable verifier identifier, for example `phala-dcap-qvl-wasm@<version>`. */
+	verifier: string;
+	/** Optional evidence provider identifiers surfaced in the verification UI. */
+	tee?: string;
+	gpu?: string;
+};
+
+/**
+ * Verifies the raw hardware evidence locally or through a separately trusted
+ * verifier. A proxy-signed receipt is never a replacement for this step.
+ */
+export type HardwareEvidenceVerifier = (input: {
+	evidence: JsonRecord;
+	nonce: string;
+	expectedModelId: string;
+	expectedEndpoint?: string;
+}) => Promise<HardwareVerification>;
+
 export type VerifyEndpointOptions = {
 	/** Expected receipt claim `model_id`, e.g. "lordx64/cyberglm". */
 	expectedModelId: string;
@@ -39,6 +60,8 @@ export type VerifyEndpointOptions = {
 	expectedRuntimeDigest?: string;
 	/** Defaults to <origin of baseURL>/attestation. */
 	attestationUrl?: string;
+	/** Required independent TDX/GPU evidence verifier. Fail closed when unavailable. */
+	verifyHardwareEvidence: HardwareEvidenceVerifier;
 	/** fetch override (testing, custom TLS dispatchers, …). */
 	fetchImpl?: typeof fetch;
 	/** Clock override in ms (testing). */
@@ -67,6 +90,8 @@ export type VerifiedProof = {
 	receiptDigest: string;
 	/** True when the evidence carried `dev: true` — synthetic plumbing proof. */
 	devMode: boolean;
+	/** The independent verifier that accepted the raw hardware evidence. */
+	hardwareVerifier: string;
 };
 
 export type VerificationResult =
@@ -231,6 +256,19 @@ export const verifyEndpoint = async (
 			throw new Error('The receipt is not bound to the returned evidence.');
 		}
 
+		// The endpoint's receipt may bind evidence, but it cannot independently
+		// establish that the evidence is genuine hardware. Require a distinct
+		// verifier before exposing a verified state to the caller.
+		const hardware = await options.verifyHardwareEvidence({
+			evidence,
+			nonce,
+			expectedModelId: options.expectedModelId,
+			expectedEndpoint: options.expectedEndpoint
+		});
+		if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
+			throw new Error('The hardware verifier did not accept the attestation evidence.');
+		}
+
 		// Surface the TLS binding for runtimes that can pin (Python SDK). A
 		// browser/Node fetch cannot observe the peer certificate; see README.
 		const tlsSpkiSha256 = asNonEmptyString(evidence.tls_spki_sha256);
@@ -260,7 +298,8 @@ export const verifyEndpoint = async (
 				tlsSpkiSha256,
 				receiptKeyId: keyId,
 				receiptDigest,
-				devMode: evidence.dev === true
+				devMode: evidence.dev === true,
+				hardwareVerifier: hardware.verifier
 			}
 		};
 	} catch (error) {

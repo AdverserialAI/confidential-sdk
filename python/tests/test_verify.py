@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fixture_server import FakeAttestProxy  # noqa: E402
 
 from adverserial import (  # noqa: E402
+    HardwareVerification,
     TLSPinMismatchError,
     VerificationError,
     VerifiedSession,
@@ -29,6 +30,10 @@ from adverserial import (  # noqa: E402
 MODEL = "lordx64/cyberglm"
 ISSUER = "https://verify.adverserial.ai"
 AUDIENCE = "cc-chat.adverserial.ai"
+
+
+def test_hardware_verifier(*_args):
+    return HardwareVerification(verified=True, verifier="test-synthetic-evidence")
 
 
 class CanonJsonTests(unittest.TestCase):
@@ -80,6 +85,7 @@ class VerifyTests(unittest.TestCase):
             issuer=ISSUER,
             audience=AUDIENCE,
             expected_endpoint=fake.endpoint,
+            hardware_verifier=test_hardware_verifier,
         )
         options.update(overrides)
         return verify_endpoint(fake.v1_url, **options)
@@ -106,6 +112,11 @@ class VerifyTests(unittest.TestCase):
         with FakeAttestProxy(model_id="other/model") as fake:
             with self.assertRaisesRegex(VerificationError, "model"):
                 self.verify(fake)
+
+    def test_missing_hardware_verifier_rejected(self):
+        with FakeAttestProxy() as fake:
+            with self.assertRaisesRegex(VerificationError, "hardware_verifier"):
+                self.verify(fake, hardware_verifier=None)
 
     def test_expired_receipt_rejected(self):
         with FakeAttestProxy(iat_offset=-600, lifetime=300) as fake:
@@ -181,6 +192,7 @@ class SessionTests(unittest.TestCase):
                 trusted_receipt_keys=fake.trusted_keys,
                 issuer=ISSUER,
                 audience=AUDIENCE,
+                hardware_verifier=test_hardware_verifier,
             )
             session = VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test")
             response = session.chat_completions(
@@ -199,6 +211,7 @@ class SessionTests(unittest.TestCase):
                 trusted_receipt_keys=fake.trusted_keys,
                 issuer=ISSUER,
                 audience=AUDIENCE,
+                hardware_verifier=test_hardware_verifier,
             )
             session = VerifiedSession(fake.v1_url, proof=proof)
             chunks = list(
@@ -219,6 +232,7 @@ class SessionTests(unittest.TestCase):
                 trusted_receipt_keys=good.trusted_keys,
                 issuer=ISSUER,
                 audience=AUDIENCE,
+                hardware_verifier=test_hardware_verifier,
             )
             session = VerifiedSession(evil.v1_url, proof=proof, api_key="sk-test")
             with self.assertRaises(TLSPinMismatchError):
@@ -242,40 +256,37 @@ class CliTests(unittest.TestCase):
             timeout=60,
         )
 
-    def test_cli_happy_path_exit_0(self):
+    def test_cli_refuses_to_claim_hardware_verification_without_adapter(self):
         with FakeAttestProxy(dev=True) as fake:
             result = self.run_cli(
                 "verify", fake.v1_url, "--trust-evidence-key", "--endpoint", fake.endpoint
             )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("VERIFIED", result.stdout)
-        self.assertIn("dev_mode", result.stdout)
-        self.assertIn("DEV MODE", result.stdout)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("independent hardware verifier", result.stderr)
 
     def test_cli_wrong_model_exit_1(self):
         with FakeAttestProxy() as fake:
             result = self.run_cli(
                 "verify", fake.v1_url, "--model", "other/model", "--trust-evidence-key"
             )
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("FAILED", result.stdout)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("independent hardware verifier", result.stderr)
 
-    def test_cli_require_hardware_fails_on_dev(self):
+    def test_cli_require_hardware_still_requires_an_adapter(self):
         with FakeAttestProxy(dev=True) as fake:
             result = self.run_cli(
                 "verify", fake.v1_url, "--trust-evidence-key", "--require-hardware"
             )
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("DEV MODE", result.stdout)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("independent hardware verifier", result.stderr)
 
     def test_cli_keys_file(self):
         with FakeAttestProxy(dev=False) as fake:
             keys_path = Path(fake._tmpdir.name) / "keys.json"
             keys_path.write_text(json.dumps(fake.trusted_keys))
             result = self.run_cli("verify", fake.v1_url, "--keys", str(keys_path))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("dev_mode", result.stdout)
-        self.assertIn("false", result.stdout)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("independent hardware verifier", result.stderr)
 
 
 if __name__ == "__main__":

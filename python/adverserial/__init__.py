@@ -23,7 +23,14 @@ from ._canonjson import canonical_json, evidence_digest
 from ._jws import b64url_decode, b64url_encode, jwk_thumbprint
 from ._tls import TLSPinMismatchError, spki_sha256_from_cert_der
 from .session import VerifiedSession
-from .verify import VerificationError, VerifiedProof, fetch_attestation, verify_endpoint
+from .verify import (
+    HardwareEvidenceVerifier,
+    HardwareVerification,
+    VerificationError,
+    VerifiedProof,
+    fetch_attestation,
+    verify_endpoint,
+)
 
 __version__ = "0.1.0"
 
@@ -32,6 +39,8 @@ __all__ = [
     "VerifiedProof",
     "VerifiedSession",
     "VerificationError",
+    "HardwareEvidenceVerifier",
+    "HardwareVerification",
     "TLSPinMismatchError",
     "fetch_attestation",
     "canonical_json",

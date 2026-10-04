@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fixture_server import FakeAttestProxy  # noqa: E402
 
 from adverserial import (  # noqa: E402
+    HardwareVerification,
     VerificationError,
     VerifiedSession,
     verify_endpoint,
@@ -26,6 +27,10 @@ AUDIENCE = "cc-chat.adverserial.ai"
 MESSAGES = [{"role": "user", "content": "hi"}]
 
 
+def test_hardware_verifier(*_args):
+    return HardwareVerification(verified=True, verifier="test-synthetic-evidence")
+
+
 class ReceiptTests(unittest.TestCase):
     def make_session(self, fake: FakeAttestProxy) -> VerifiedSession:
         proof = verify_endpoint(
@@ -35,6 +40,7 @@ class ReceiptTests(unittest.TestCase):
             issuer=ISSUER,
             audience=AUDIENCE,
             expected_endpoint=fake.endpoint,
+            hardware_verifier=test_hardware_verifier,
         )
         return VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test-key-123")
 
