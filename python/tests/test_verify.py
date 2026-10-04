@@ -163,6 +163,11 @@ class VerifyTests(unittest.TestCase):
             with self.assertRaisesRegex(VerificationError, "bound to the returned evidence"):
                 self.verify(fake)
 
+    def test_missing_tdx_event_log_rejected_before_hardware_callback(self):
+        with FakeAttestProxy(omit_event_log=True) as fake:
+            with self.assertRaisesRegex(VerificationError, "event log"):
+                self.verify(fake)
+
     def test_endpoint_claim_mismatch_rejected(self):
         with FakeAttestProxy() as fake:
             with self.assertRaisesRegex(VerificationError, "endpoint"):

@@ -236,6 +236,7 @@ class _Handler(BaseHTTPRequestHandler):
             "issued_at": _iso(now),
             "expires_at": _iso(expires),
             "tdx_quote": "4445565154453030" + "ab" * 32,  # synthetic DEVQTE00…
+            "tdx_event_log": {"synthetic": True, "rtmr": ["ab" * 48]},
             "tls_spki_sha256": (
                 fake.other_tls_spki_sha256 if fake.spki_lie else fake.tls_spki_sha256
             ),
@@ -252,6 +253,8 @@ class _Handler(BaseHTTPRequestHandler):
         }
         if fake.dev:
             evidence["dev"] = True
+        if fake.omit_event_log:
+            evidence.pop("tdx_event_log")
 
         claims: Dict[str, Any] = {
             "iss": fake.issuer,
@@ -280,7 +283,7 @@ class FakeAttestProxy:
     """Threaded TLS server speaking the attestation protocol.
 
     Failure knobs: model_id, verdict, nonce_override, iat_offset, lifetime,
-    sign_with_wrong_key, tamper_evidence, spki_lie, model_digest_claim,
+    sign_with_wrong_key, tamper_evidence, spki_lie, omit_event_log, model_digest_claim,
     receipts, tamper_response_body, receipt_model_override, receipt_expired.
     """
 
@@ -299,6 +302,7 @@ class FakeAttestProxy:
         sign_with_wrong_key: bool = False,
         tamper_evidence: bool = False,
         spki_lie: bool = False,
+        omit_event_log: bool = False,
         model_digest_claim: Optional[str] = None,
         receipts: bool = True,
         tamper_response_body: bool = False,
@@ -317,6 +321,7 @@ class FakeAttestProxy:
         self.sign_with_wrong_key = sign_with_wrong_key
         self.tamper_evidence = tamper_evidence
         self.spki_lie = spki_lie
+        self.omit_event_log = omit_event_log
         self.model_digest_claim = model_digest_claim
         self.receipts = receipts
         self.tamper_response_body = tamper_response_body

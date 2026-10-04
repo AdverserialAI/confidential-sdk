@@ -259,6 +259,15 @@ export const verifyEndpoint = async (
 		if (asNonEmptyString(claims.evidence_sha256) !== digest) {
 			throw new Error('The receipt is not bound to the returned evidence.');
 		}
+		if (!asNonEmptyString(evidence.tdx_quote)) {
+			throw new Error('The evidence is missing the TDX quote.');
+		}
+		// An RTMR replay is necessary to connect a valid quote to the workload
+		// being measured. Preserve its native JSON shape for the hardware
+		// verifier; only null and an empty string are invalid here.
+		if (evidence.tdx_event_log === null || evidence.tdx_event_log === undefined || evidence.tdx_event_log === '') {
+			throw new Error('The evidence is missing the TDX event log.');
+		}
 
 		// The endpoint's receipt may bind evidence, but it cannot independently
 		// establish that the evidence is genuine hardware. Require a distinct

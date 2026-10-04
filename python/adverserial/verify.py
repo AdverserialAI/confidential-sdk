@@ -268,6 +268,17 @@ def verify_endpoint(
         claims.get("evidence_sha256") == evidence_digest,
         "the receipt is not bound to the returned evidence",
     )
+    _expect(
+        isinstance(evidence.get("tdx_quote"), str) and bool(evidence["tdx_quote"]),
+        "the evidence is missing the TDX quote",
+    )
+    # A signed quote without its RTMR replay material cannot establish which
+    # workload was measured. The independent verifier receives both fields.
+    event_log = evidence.get("tdx_event_log")
+    _expect(
+        event_log is not None and event_log != "",
+        "the evidence is missing the TDX event log",
+    )
     tls_spki = evidence.get("tls_spki_sha256")
     _expect(
         isinstance(tls_spki, str) and tls_spki.startswith("sha256:"),
