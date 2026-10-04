@@ -94,6 +94,8 @@ class VerifiedProof:
     runtime_digest: Optional[str] = None
     policy_id: Optional[str] = None
     compose_digest: Optional[str] = None
+    # Stable state digest cited by per-request inference receipts.
+    attestation_state_digest: Optional[str] = None
     # The evidence-published receipt public JWK (thumbprint-checked against
     # the attestation receipt's kid). VerifiedSession uses it to verify WP-7
     # per-request receipts.
@@ -330,6 +332,7 @@ def verify_endpoint(
         runtime_digest=claims.get("runtime_digest") if isinstance(claims.get("runtime_digest"), str) else None,
         policy_id=workload.get("policy_id") if isinstance(workload.get("policy_id"), str) else None,
         compose_digest=workload.get("compose_digest") if isinstance(workload.get("compose_digest"), str) else None,
+        attestation_state_digest=evidence.get("attestation_state_digest") if isinstance(evidence.get("attestation_state_digest"), str) else None,
         receipt_jwk=receipt_jwk,
         hardware_verifier=hardware.verifier,
     )

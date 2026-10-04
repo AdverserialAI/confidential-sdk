@@ -110,6 +110,7 @@ class VerifiedSession:
         proof: VerifiedProof,
         api_key: Optional[str] = None,
         timeout: float = 60.0,
+        require_receipts: bool = True,
     ) -> None:
         if getattr(proof, "status", None) != "verified":
             raise VerificationError(
@@ -125,6 +126,9 @@ class VerifiedSession:
         self._proof = proof
         self._api_key = api_key
         self._timeout = timeout
+        self._require_receipts = require_receipts
+        if require_receipts and not proof.attestation_state_digest:
+            raise VerificationError("VerifiedSession requires attestation_state_digest to verify inference receipts")
 
     @property
     def proof(self) -> VerifiedProof:
@@ -234,6 +238,8 @@ class VerifiedSession:
                     model_id=model_id,
                 )
                 verified = True
+            elif self._require_receipts:
+                raise VerificationError("the confidential endpoint did not return a signed inference receipt")
             return CompletionResponse(
                 json.loads(data), receipt_verified=verified, receipt_claims=claims
             )
@@ -312,6 +318,8 @@ class VerifiedSession:
                 )
                 stream.receipt_verified = True
                 stream.receipt_claims = claims
+            elif self._require_receipts:
+                raise VerificationError("the confidential endpoint did not return a signed inference receipt")
 
         stream._generator = events()
         return stream
@@ -375,6 +383,8 @@ class VerifiedSession:
             raise VerificationError(
                 "the per-request receipt is bound to a different TLS key"
             )
+        if proof.attestation_state_digest and binding.get("evidence_digest") != proof.attestation_state_digest:
+            raise VerificationError("the per-request receipt is bound to a different attestation state")
         iat, exp = claims.get("iat"), claims.get("exp")
         if not isinstance(iat, (int, float)) or not isinstance(exp, (int, float)):
             raise VerificationError("the per-request receipt is missing iat/exp")

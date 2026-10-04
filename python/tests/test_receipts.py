@@ -113,9 +113,13 @@ class ReceiptTests(unittest.TestCase):
             assert resp.receipt_claims is not None
             self.assertTrue(resp.receipt_claims["request_nonce"])
 
-    def test_absent_receipt_is_unverified_not_fatal(self):
+    def test_absent_receipt_requires_explicit_compatibility_opt_out(self):
         with FakeAttestProxy(receipts=False) as fake:
-            session = self.make_session(fake)
+            strict = self.make_session(fake)
+            with self.assertRaisesRegex(VerificationError, "did not return a signed inference receipt"):
+                strict.chat_completions(MESSAGES)
+            proof = strict.proof
+            session = VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test-key-123", require_receipts=False)
             resp = session.chat_completions(MESSAGES)
             self.assertFalse(resp.receipt_verified)
             self.assertIsNone(resp.receipt_claims)

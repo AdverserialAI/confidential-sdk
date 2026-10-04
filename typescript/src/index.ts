@@ -11,3 +11,6 @@ export type {
 } from './verify.js';
 export { createVerifiedOpenAI, VerificationRequiredError } from './openai.js';
 export type { VerifiedOpenAI, VerifiedOpenAIOptions } from './openai.js';
+
+export { verifyInferenceReceipt } from './inference-receipt.js';
+export type { InferenceReceiptProof, VerifyInferenceReceiptOptions } from './inference-receipt.js';

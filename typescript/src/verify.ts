@@ -92,6 +92,10 @@ export type VerifiedProof = {
 	devMode: boolean;
 	/** The independent verifier that accepted the raw hardware evidence. */
 	hardwareVerifier: string;
+	/** Public P-256 key bound by the attestation, used for per-request receipts. */
+	receiptPublicKey: JsonWebKey;
+	/** Stable attestation state referenced by signed inference receipts. */
+	attestationStateDigest: string;
 };
 
 export type VerificationResult =
@@ -277,6 +281,12 @@ export const verifyEndpoint = async (
 		}
 
 		const workload = asObject(evidence.workload) ?? {};
+		const receiptPublicKey = asObject(evidence.receipt_pubkey_jwk) as JsonWebKey | null;
+		if (!receiptPublicKey || receiptPublicKey.kty !== 'EC' || receiptPublicKey.crv !== 'P-256' || receiptPublicKey.x !== options.trustedReceiptKeys[keyId]?.x || receiptPublicKey.y !== options.trustedReceiptKeys[keyId]?.y) {
+			throw new Error('The evidence receipt key does not match the pinned attestation signer.');
+		}
+		const attestationStateDigest = asNonEmptyString(evidence.attestation_state_digest);
+		if (!attestationStateDigest?.startsWith('sha256:')) throw new Error('The evidence is missing attestation_state_digest.');
 		return {
 			status: 'verified',
 			proof: {
@@ -299,7 +309,9 @@ export const verifyEndpoint = async (
 				receiptKeyId: keyId,
 				receiptDigest,
 				devMode: evidence.dev === true,
-				hardwareVerifier: hardware.verifier
+				hardwareVerifier: hardware.verifier,
+				receiptPublicKey,
+				attestationStateDigest
 			}
 		};
 	} catch (error) {
