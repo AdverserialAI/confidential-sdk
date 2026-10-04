@@ -159,3 +159,7 @@ boot** until KMS sealing lands, so today the key is published in the
 evidence as `receipt_pubkey_jwk`; bootstrapping trust from that (the CLI's
 `--trust-evidence-key`, the node test's TOFU step) is a development
 convenience, not a security boundary.
+
+## Security
+
+Please report security vulnerabilities privately to [security@adverserial.ai](mailto:security@adverserial.ai). Do not open a public issue for a suspected vulnerability.
