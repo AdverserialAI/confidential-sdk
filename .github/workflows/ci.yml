@@ -27,3 +27,21 @@ jobs:
         with: {python-version: '3.12'}
       - run: pip install -e .
       - run: python -m unittest discover -s tests -v
+  plugins:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: plugins}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: plugins/package-lock.json}
+      - run: npm ci
+      - run: npm run build
+  gateway:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: gateway}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -e ../python -e .
+      - run: python -m unittest discover -s tests -v

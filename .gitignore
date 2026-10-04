@@ -4,3 +4,5 @@ __pycache__/
 node_modules/
 dist/
 test/.tmp/
+.venv/
+*.egg-info/

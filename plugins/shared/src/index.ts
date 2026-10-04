@@ -12,4 +12,5 @@ export {
 export type { CoreConfig, CoreEnv, ResolveConfigOptions } from './config.js';
 export { CACHE_TTL_MS, FETCH_TIMEOUT_MS, VerificationCache, runVerification, summarizeConfig } from './verify.js';
 export type { CacheEntry, ConfigSummary, CoreVerdict, TrustLevel, VerifyDeps } from './verify.js';
+export { hardwareVerifier } from './hardware.js';
 export { formatStatus, formatVerdict, humanDuration } from './format.js';

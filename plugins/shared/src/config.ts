@@ -41,6 +41,8 @@ export type CoreConfig = {
 	trustEvidenceKey: boolean;
 	/** True when baseURL points at a loopback host. */
 	loopback: boolean;
+	/** Executable that independently verifies TDX/GPU evidence over stdin/stdout. */
+	hardwareVerifierCommand: string | null;
 };
 
 export class ConfigError extends Error {
@@ -154,7 +156,8 @@ export const resolveConfig = (env: CoreEnv, options?: ResolveConfigOptions): Cor
 		trustedReceiptKeys,
 		keysSource,
 		trustEvidenceKey: envFlag(env.ADVERSERIAL_TRUST_EVIDENCE_KEY) || options?.trustEvidenceKey === true,
-		loopback: isLoopbackURL(baseURL)
+		loopback: isLoopbackURL(baseURL),
+		hardwareVerifierCommand: env.ADVERSERIAL_HARDWARE_VERIFIER_COMMAND?.trim() || null
 	};
 };
 

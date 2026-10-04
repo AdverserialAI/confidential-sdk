@@ -1,39 +1,49 @@
-# Harness plugins for Adverserial endpoint attestation
+# Confidential client integrations
 
-Coding-agent plugins that verify the attestation of the Adverserial
-confidential inference endpoint from inside a session. Both wrap the
-TypeScript SDK (`../typescript`, `@adverserial/sdk`) through a small shared
-core (`shared/`) and never claim "verified" without pinned receipt keys —
-the only escape is the explicit, loudly-labelled UNPINNED (TOFU dev mode).
-Production deployments pin receipt keys from https://verify.adverserial.ai.
+These integrations verify an Adverserial confidential-inference endpoint
+before a coding client is configured to use it. They keep the current
+`https://api.adverserial.ai` integrations untouched: the confidential route is
+an explicit opt-in path through a local gateway, then directly to the CVM.
 
-| Directory | Harness | Integration |
+A proxy receipt is not hardware proof. Every integration requires all of:
+
+1. pinned receipt keys and policy from `https://verify.adverserial.ai`;
+2. fresh nonce-bound endpoint evidence; and
+3. an independently installed TDX/GPU verifier named by
+   `ADVERSERIAL_HARDWARE_VERIFIER_COMMAND`.
+
+Missing any one of these produces a failure, never a “verified” result. The
+verifier receives evidence only—never a prompt, API key, identity, or model
+response.
+
+| Directory | Client | Integration |
 | --- | --- | --- |
-| [`opencode/`](opencode/) | opencode | Plugin module registering `adverserial_verify` + `adverserial_status` tools |
-| [`kimi-code/`](kimi-code/) | Kimi Code CLI | `bin/adverserial-verify` CLI (exit 0/1) + skill + SessionStart hook via `kimi.plugin.json` |
+| [`adverserial-verify/`](adverserial-verify/) | Codex | Codex plugin skill that requires local verification before confidential use |
+| [`opencode/`](opencode/) | OpenCode | Plugin tools: `adverserial_verify` and `adverserial_status` |
+| [`kimi-code/`](kimi-code/) | Kimi Code | CLI, skill, and SessionStart hook |
+| [`../gateway/`](../gateway/) | OpenAI-compatible local clients | Loopback-only gateway; API key → billing entitlement → direct attested endpoint |
+
+Claude Code and Codex Responses support stay on the existing shim while their
+mature adapters are extracted into the local gateway and regression-tested.
+That avoids changing working user traffic or falsely describing an adapter as
+confidential before it actually sends direct to the CVM.
 
 ## Build
 
 ```sh
 npm install
-npm run build          # tsc for both plugins
+npm run build
 ```
 
-Each plugin compiles the SDK sources + the shared core + its own entry into
-a self-contained `dist/` tree (no runtime dependencies, no npm publishing;
-the SDK is imported straight from the source tree).
-
-## Verify against a DEV_MODE attest-proxy
+Set at least:
 
 ```sh
-(cd ../../attest-proxy && DEV_MODE=1 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy)
-# find the bound port, then:
-
-ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 \
-  node kimi-code/bin/adverserial-verify --trust-evidence-key
-
-ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 ADVERSERIAL_TRUST_EVIDENCE_KEY=1 \
-  node opencode/test/smoke.mjs
+export ADVERSERIAL_RECEIPT_KEYS_FILE="$HOME/.config/adverserial/receipt-keys.json"
+export ADVERSERIAL_HARDWARE_VERIFIER_COMMAND='/absolute/path/to/adverserial-hardware-verify'
 ```
 
-See each plugin's README for install and usage.
+The independent verifier must emit a small JSON result on stdout such as
+`{"verified":true,"verifier":"vendor-verifier@version"}`. It is invoked
+without a shell and receives the evidence JSON over stdin.
+
+Please report security vulnerabilities privately to security@adverserial.ai.

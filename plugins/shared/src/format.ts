@@ -51,6 +51,7 @@ export const formatVerdict = (verdict: CoreVerdict, now: number = Date.now()): s
 
 	lines.push(field('endpoint', config.baseURL));
 	lines.push(field('model', config.modelId + (verdict.status === 'failed' ? ' (expected)' : '')));
+	lines.push(field('hardware', config.hardwareVerifierConfigured ? 'independent verifier configured' : 'NOT configured'));
 
 	if (verdict.status === 'failed') {
 		lines.push(field('reason', verdict.reason));

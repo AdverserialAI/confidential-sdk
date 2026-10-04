@@ -7,6 +7,7 @@
 import { toBase64Url, verifyEndpoint } from '../../../typescript/src/index.js';
 import type { TrustedReceiptKeys, VerifiedProof } from '../../../typescript/src/index.js';
 import type { CoreConfig } from './config.js';
+import { hardwareVerifier } from './hardware.js';
 
 export const CACHE_TTL_MS = 5 * 60_000;
 export const FETCH_TIMEOUT_MS = 15_000;
@@ -22,6 +23,7 @@ export type ConfigSummary = {
 	expectedEndpoint?: string;
 	keysSource: string | null;
 	trustEvidenceKey: boolean;
+	hardwareVerifierConfigured: boolean;
 };
 
 export type CoreVerdict =
@@ -41,7 +43,8 @@ export const summarizeConfig = (config: CoreConfig): ConfigSummary => ({
 	audience: config.audience,
 	...(config.expectedEndpoint ? { expectedEndpoint: config.expectedEndpoint } : {}),
 	keysSource: config.keysSource,
-	trustEvidenceKey: config.trustEvidenceKey
+	trustEvidenceKey: config.trustEvidenceKey,
+	hardwareVerifierConfigured: config.hardwareVerifierCommand !== null,
 });
 
 const withTimeout = (fetchImpl: typeof fetch, ms: number): typeof fetch =>
@@ -134,6 +137,7 @@ export const runVerification = async (config: CoreConfig, deps?: VerifyDeps): Pr
 		issuer: config.issuer,
 		audience: config.audience,
 		...(config.expectedEndpoint ? { expectedEndpoint: config.expectedEndpoint } : {}),
+		verifyHardwareEvidence: hardwareVerifier(config.hardwareVerifierCommand),
 		fetchImpl
 	});
 

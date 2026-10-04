@@ -90,6 +90,7 @@ ADVERSERIAL ATTESTATION: VERIFIED — UNPINNED (TOFU dev mode)
 | `ADVERSERIAL_RECEIPT_KEYS_JSON` | unset | Pinned keys: JSON map kid → public JWK |
 | `ADVERSERIAL_RECEIPT_KEYS_FILE` | unset | Path to a JSON file with that map |
 | `ADVERSERIAL_TRUST_EVIDENCE_KEY` | unset | `=1` enables the TOFU dev escape hatch |
+| `ADVERSERIAL_HARDWARE_VERIFIER_COMMAND` | unset | Required executable that independently validates TDX/GPU evidence; no value means verification fails closed |
 
 Notes:
 
