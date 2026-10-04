@@ -120,9 +120,10 @@ class Dispatcher:
         entitlement = self.entitlement(api_key, model, max_input, max_output, proof)
         outbound = dict(payload)
         outbound.pop("model", None)
+        stream = bool(outbound.pop("stream", False))
         outbound["max_tokens"] = max_output
         session = VerifiedSession(self.config.cc_api_url, proof=proof, api_key=entitlement, timeout=600)
-        return session.chat_completions(outbound.pop("messages", []), model=model, **outbound)
+        return session.chat_completions(outbound.pop("messages", []), model=model, stream=stream, **outbound)
 
     def adapted_completion(self, api_key: str, model: str, payload: Mapping[str, Any]):
         """Dispatch a locally translated request after binding it to a canonical model."""

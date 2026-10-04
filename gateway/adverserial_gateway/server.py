@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .config import Config, ConfigError
+from adverserial import VerificationError
+
 from .compat import anthropic_to_chat, chat_to_anthropic, chat_to_response, responses_to_chat
 from .core import AuthorizationError, ClientRequestError, Dispatcher, GatewayError
 
@@ -28,6 +31,75 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
+
+    def _sse_start(self):
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+    def _sse(self, payload: dict, event: str | None = None):
+        if event:
+            self.wfile.write(f"event: {event}\n".encode())
+        self.wfile.write(b"data: " + json.dumps(payload, separators=(",", ":")).encode() + b"\n\n")
+        self.wfile.flush()
+
+    def _stream_openai(self, stream):
+        self._sse_start()
+        try:
+            for chunk in stream:
+                self._sse(chunk)
+            if not stream.receipt_verified:
+                raise ClientRequestError("confidential stream ended without a verified receipt")
+            self.wfile.write(b"data: [DONE]\n\n")
+        except (GatewayError, VerificationError, ValueError, OSError) as exc:
+            self._sse({"error": {"type": "confidential_gateway_error", "message": str(exc)}}, "error")
+
+    def _stream_anthropic(self, stream, model: str):
+        self._sse_start(); message_id = "msg_" + uuid.uuid4().hex
+        self._sse({"type":"message_start","message":{"id":message_id,"type":"message","role":"assistant","model":model,"content":[],"stop_reason":None,"stop_sequence":None,"usage":{"input_tokens":0,"output_tokens":0}}}, "message_start")
+        self._sse({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}, "content_block_start")
+        try:
+            usage = {}
+            for chunk in stream:
+                choice = (chunk.get("choices") or [{}])[0]
+                delta = choice.get("delta") or {}
+                text = delta.get("content")
+                if text:
+                    self._sse({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":text}}, "content_block_delta")
+                usage = chunk.get("usage") or usage
+            if not stream.receipt_verified:
+                raise ClientRequestError("confidential stream ended without a verified receipt")
+            self._sse({"type":"content_block_stop","index":0}, "content_block_stop")
+            self._sse({"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":None},"usage":{"output_tokens":usage.get("completion_tokens",0)}}, "message_delta")
+            self._sse({"type":"message_stop"}, "message_stop")
+        except (GatewayError, VerificationError, ValueError, OSError) as exc:
+            self._sse({"type":"error","error":{"type":"api_error","message":str(exc)}}, "error")
+
+    def _stream_responses(self, stream, model: str):
+        self._sse_start(); rid = "resp_" + uuid.uuid4().hex; mid = "msg_" + uuid.uuid4().hex
+        self._sse({"type":"response.created","response":{"id":rid,"object":"response","status":"in_progress","model":model,"output":[]}}, "response.created")
+        self._sse({"type":"response.output_item.added","output_index":0,"item":{"id":mid,"type":"message","status":"in_progress","role":"assistant","content":[]}}, "response.output_item.added")
+        self._sse({"type":"response.content_part.added","item_id":mid,"output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}, "response.content_part.added")
+        try:
+            usage = {}
+            for chunk in stream:
+                choice = (chunk.get("choices") or [{}])[0]
+                delta = choice.get("delta") or {}
+                text = delta.get("content")
+                if text:
+                    self._sse({"type":"response.output_text.delta","item_id":mid,"output_index":0,"content_index":0,"delta":text}, "response.output_text.delta")
+                usage = chunk.get("usage") or usage
+            if not stream.receipt_verified:
+                raise ClientRequestError("confidential stream ended without a verified receipt")
+            self._sse({"type":"response.output_text.done","item_id":mid,"output_index":0,"content_index":0,"text":""}, "response.output_text.done")
+            self._sse({"type":"response.content_part.done","item_id":mid,"output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}, "response.content_part.done")
+            item={"id":mid,"type":"message","status":"completed","role":"assistant","content":[]}
+            self._sse({"type":"response.output_item.done","output_index":0,"item":item}, "response.output_item.done")
+            self._sse({"type":"response.completed","response":{"id":rid,"object":"response","status":"completed","model":model,"output":[item],"usage":{"input_tokens":usage.get("prompt_tokens",0),"output_tokens":usage.get("completion_tokens",0),"total_tokens":usage.get("total_tokens",0)}}}, "response.completed")
+        except (GatewayError, VerificationError, ValueError, OSError) as exc:
+            self._sse({"type":"response.failed","response":{"id":rid,"object":"response","status":"failed","error":{"code":"confidential_gateway_error","message":str(exc)}}}, "response.failed")
 
     def do_GET(self):
         if self.path == "/healthz":
@@ -51,22 +123,26 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(size))
             if not isinstance(payload, dict):
                 raise ClientRequestError("Request must be a JSON object")
-            if payload.get("stream"):
-                raise ClientRequestError("Streaming is not enabled yet on confidential compatibility adapters")
+            streaming = bool(payload.get("stream"))
             if path == "/v1/messages":
                 model = payload.get("model")
                 if not isinstance(model, str):
                     raise ClientRequestError("model is required")
-                result = self.dispatcher.adapted_completion(api_key, model, anthropic_to_chat(payload))
+                chat = anthropic_to_chat(payload); chat["stream"] = streaming
+                result = self.dispatcher.adapted_completion(api_key, model, chat)
+                if streaming: return self._stream_anthropic(result, model)
                 self._json(HTTPStatus.OK, chat_to_anthropic(dict(result), model))
             elif path in {"/v1/responses", "/responses"}:
                 model = payload.get("model")
                 if not isinstance(model, str):
                     raise ClientRequestError("model is required")
-                result = self.dispatcher.adapted_completion(api_key, model, responses_to_chat(payload))
+                chat = responses_to_chat(payload); chat["stream"] = streaming
+                result = self.dispatcher.adapted_completion(api_key, model, chat)
+                if streaming: return self._stream_responses(result, model)
                 self._json(HTTPStatus.OK, chat_to_response(dict(result), model))
             else:
                 result = self.dispatcher.completion(api_key, payload)
+                if streaming: return self._stream_openai(result)
                 self._json(HTTPStatus.OK, dict(result))
         except GatewayError as exc:
             self._json(exc.status_code, {"error": {"type": "confidential_gateway_error", "message": str(exc)}})

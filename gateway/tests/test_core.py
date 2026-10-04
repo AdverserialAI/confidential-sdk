@@ -40,6 +40,17 @@ class CoreTests(unittest.TestCase):
         self.assertNotEqual(session.call_args.kwargs["api_key"], entitlement.call_args.args[0])
         self.assertEqual(session.return_value.chat_completions.call_args.kwargs["model"], "lordx64/cyberglm")
 
+    def test_gateway_forwards_stream_flag_to_verified_session(self):
+        proof = object()
+        payload = {"model": "lordx64/cyberglm", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 12, "stream": True}
+        with patch.object(self.dispatcher, "proof_for", return_value=proof), patch.object(
+            self.dispatcher, "entitlement", return_value="signed-entitlement"
+        ), patch("adverserial_gateway.core.VerifiedSession") as session:
+            stream = object(); session.return_value.chat_completions.return_value = stream
+            result = self.dispatcher.completion("sk-" + "x" * 24, payload)
+        self.assertIs(result, stream)
+        self.assertTrue(session.return_value.chat_completions.call_args.kwargs["stream"])
+
 
 if __name__ == "__main__":
     unittest.main()
