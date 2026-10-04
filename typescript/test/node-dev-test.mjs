@@ -122,7 +122,8 @@ try {
 		issuer: ISSUER,
 		audience: AUDIENCE,
 		expectedEndpoint: base,
-		verifyHardwareEvidence: async () => ({ verified: true, verifier: 'test-synthetic-evidence' })
+		verifyHardwareEvidence: async () => ({ verified: true, verifier: 'test-synthetic-evidence' }),
+		allowDevMode: true
 	};
 
 	// 1. Happy path against the real proxy.

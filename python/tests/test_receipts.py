@@ -41,6 +41,7 @@ class ReceiptTests(unittest.TestCase):
             audience=AUDIENCE,
             expected_endpoint=fake.endpoint,
             hardware_verifier=test_hardware_verifier,
+            allow_dev_mode=True,
         )
         return VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test-key-123")
 

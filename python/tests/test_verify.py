@@ -86,6 +86,7 @@ class VerifyTests(unittest.TestCase):
             audience=AUDIENCE,
             expected_endpoint=fake.endpoint,
             hardware_verifier=test_hardware_verifier,
+            allow_dev_mode=True,
         )
         options.update(overrides)
         return verify_endpoint(fake.v1_url, **options)
@@ -102,6 +103,18 @@ class VerifyTests(unittest.TestCase):
         self.assertIn(proof.receipt_key_id, fake.trusted_keys)
         self.assertEqual(proof.policy_id, "adverserial-policy/dev")
         self.assertLess(proof.issued_epoch, proof.expires_epoch)
+
+    def test_dev_mode_is_rejected_without_explicit_test_opt_in(self):
+        with FakeAttestProxy(dev=True) as fake:
+            with self.assertRaisesRegex(VerificationError, "DEV_MODE"):
+                verify_endpoint(
+                    fake.v1_url,
+                    expected_model_id=MODEL,
+                    trusted_receipt_keys=fake.trusted_keys,
+                    issuer=ISSUER,
+                    audience=AUDIENCE,
+                    hardware_verifier=test_hardware_verifier,
+                )
 
     def test_production_evidence_has_dev_mode_false(self):
         with FakeAttestProxy(dev=False) as fake:
@@ -198,6 +211,7 @@ class SessionTests(unittest.TestCase):
                 issuer=ISSUER,
                 audience=AUDIENCE,
                 hardware_verifier=test_hardware_verifier,
+                allow_dev_mode=True,
             )
             session = VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test")
             response = session.chat_completions(
@@ -217,6 +231,7 @@ class SessionTests(unittest.TestCase):
                 issuer=ISSUER,
                 audience=AUDIENCE,
                 hardware_verifier=test_hardware_verifier,
+                allow_dev_mode=True,
             )
             session = VerifiedSession(fake.v1_url, proof=proof)
             chunks = list(
@@ -238,6 +253,7 @@ class SessionTests(unittest.TestCase):
                 issuer=ISSUER,
                 audience=AUDIENCE,
                 hardware_verifier=test_hardware_verifier,
+                allow_dev_mode=True,
             )
             session = VerifiedSession(evil.v1_url, proof=proof, api_key="sk-test")
             with self.assertRaises(TLSPinMismatchError):

@@ -179,6 +179,7 @@ def verify_endpoint(
     expected_model_digest: Optional[str] = None,
     expected_runtime_digest: Optional[str] = None,
     hardware_verifier: Optional[HardwareEvidenceVerifier] = None,
+    allow_dev_mode: bool = False,
     attestation_url: Optional[str] = None,
     timeout: float = 15.0,
     now: Optional[Callable[[], float]] = None,
@@ -279,6 +280,8 @@ def verify_endpoint(
         event_log is not None and event_log != "",
         "the evidence is missing the TDX event log",
     )
+    if evidence.get("dev") is True and not allow_dev_mode:
+        raise VerificationError("synthetic DEV_MODE evidence is not accepted by this client")
     tls_spki = evidence.get("tls_spki_sha256")
     _expect(
         isinstance(tls_spki, str) and tls_spki.startswith("sha256:"),

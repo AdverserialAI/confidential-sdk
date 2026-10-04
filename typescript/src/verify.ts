@@ -62,6 +62,8 @@ export type VerifyEndpointOptions = {
 	attestationUrl?: string;
 	/** Required independent TDX/GPU evidence verifier. Fail closed when unavailable. */
 	verifyHardwareEvidence: HardwareEvidenceVerifier;
+	/** Test-only opt-in for a proxy explicitly marked with synthetic DEV_MODE evidence. */
+	allowDevMode?: boolean;
 	/** fetch override (testing, custom TLS dispatchers, …). */
 	fetchImpl?: typeof fetch;
 	/** Clock override in ms (testing). */
@@ -267,6 +269,9 @@ export const verifyEndpoint = async (
 		// verifier; only null and an empty string are invalid here.
 		if (evidence.tdx_event_log === null || evidence.tdx_event_log === undefined || evidence.tdx_event_log === '') {
 			throw new Error('The evidence is missing the TDX event log.');
+		}
+		if (evidence.dev === true && options.allowDevMode !== true) {
+			throw new Error('Synthetic DEV_MODE evidence is not accepted by this client.');
 		}
 
 		// The endpoint's receipt may bind evidence, but it cannot independently
