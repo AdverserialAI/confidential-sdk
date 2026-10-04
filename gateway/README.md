@@ -36,10 +36,18 @@ normal Adverserial API key, and canonical model IDs only:
 
 ## Scope of this first release
 
-It handles non-streaming OpenAI Chat Completions and fails closed. The existing
-Claude Messages and Codex Responses adapters remain on `api.adverserial.ai`
-while their well-tested translation logic is extracted into the local gateway
-and regression-tested. This preserves current integrations without claiming
-that they are confidential before they are.
+It handles non-streaming OpenAI Chat Completions, Anthropic Messages, and
+OpenAI Responses on the same loopback endpoint and fails closed. Each adapter
+converts to an OpenAI-compatible request locally, then follows the identical
+attestation → entitlement → pinned direct-TLS → signed-receipt path. Use:
+
+- OpenAI: `POST /v1/chat/completions`
+- Claude-compatible clients: `POST /v1/messages`
+- Codex-compatible clients: `POST /v1/responses`
+
+Streaming, image/document blocks, server-side Responses state, and hosted
+provider tools are intentionally rejected in this preview. They must not fall
+back to `api.adverserial.ai` silently, because that would weaken the stated
+confidential path.
 
 Please report security vulnerabilities privately to security@adverserial.ai.

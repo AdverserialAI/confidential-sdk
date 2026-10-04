@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .config import Config, ConfigError
+from .compat import anthropic_to_chat, chat_to_anthropic, chat_to_response, responses_to_chat
 from .core import AuthorizationError, ClientRequestError, Dispatcher, GatewayError
 
 
@@ -34,7 +35,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(HTTPStatus.NOT_FOUND, {"error": {"message": "Not found"}})
 
     def do_POST(self):
-        if self.path != "/v1/chat/completions":
+        path = self.path.split("?", 1)[0]
+        if path not in {"/v1/chat/completions", "/v1/messages", "/v1/responses", "/responses"}:
             return self._json(HTTPStatus.NOT_FOUND, {"error": {"message": "Unsupported local gateway endpoint"}})
         length = self.headers.get("content-length")
         try:
@@ -50,9 +52,22 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise ClientRequestError("Request must be a JSON object")
             if payload.get("stream"):
-                raise ClientRequestError("Streaming is not enabled in the initial local gateway release")
-            result = self.dispatcher.completion(api_key, payload)
-            self._json(HTTPStatus.OK, dict(result))
+                raise ClientRequestError("Streaming is not enabled yet on confidential compatibility adapters")
+            if path == "/v1/messages":
+                model = payload.get("model")
+                if not isinstance(model, str):
+                    raise ClientRequestError("model is required")
+                result = self.dispatcher.adapted_completion(api_key, model, anthropic_to_chat(payload))
+                self._json(HTTPStatus.OK, chat_to_anthropic(dict(result), model))
+            elif path in {"/v1/responses", "/responses"}:
+                model = payload.get("model")
+                if not isinstance(model, str):
+                    raise ClientRequestError("model is required")
+                result = self.dispatcher.adapted_completion(api_key, model, responses_to_chat(payload))
+                self._json(HTTPStatus.OK, chat_to_response(dict(result), model))
+            else:
+                result = self.dispatcher.completion(api_key, payload)
+                self._json(HTTPStatus.OK, dict(result))
         except GatewayError as exc:
             self._json(exc.status_code, {"error": {"type": "confidential_gateway_error", "message": str(exc)}})
         except (ValueError, TypeError) as exc:

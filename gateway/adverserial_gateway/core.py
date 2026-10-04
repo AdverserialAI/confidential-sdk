@@ -123,3 +123,9 @@ class Dispatcher:
         outbound["max_tokens"] = max_output
         session = VerifiedSession(self.config.cc_api_url, proof=proof, api_key=entitlement, timeout=600)
         return session.chat_completions(outbound.pop("messages", []), model=model, **outbound)
+
+    def adapted_completion(self, api_key: str, model: str, payload: Mapping[str, Any]):
+        """Dispatch a locally translated request after binding it to a canonical model."""
+        outbound = dict(payload)
+        outbound["model"] = model
+        return self.completion(api_key, outbound)
