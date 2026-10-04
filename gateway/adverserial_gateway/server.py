@@ -46,7 +46,7 @@ class Handler(BaseHTTPRequestHandler):
         if size < 1 or size > 64 * 1024 * 1024:
             return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": {"message": "Invalid request size"}})
         auth = self.headers.get("authorization", "")
-        api_key = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
+        api_key = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else self.headers.get("x-api-key", "").strip()
         try:
             payload = json.loads(self.rfile.read(size))
             if not isinstance(payload, dict):
