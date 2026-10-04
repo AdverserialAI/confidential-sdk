@@ -240,6 +240,7 @@ class _Handler(BaseHTTPRequestHandler):
             "tls_spki_sha256": (
                 fake.other_tls_spki_sha256 if fake.spki_lie else fake.tls_spki_sha256
             ),
+            "tls_spki_der": _b64url(fake.tls_cert.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)),
             "receipt_pubkey_jwk": fake.receipt_jwk,
             "attestation_state_digest": "sha256:" + _b64url(hashlib.sha256(b"fixture-state").digest()),
             "workload": {

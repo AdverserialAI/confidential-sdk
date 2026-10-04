@@ -22,6 +22,8 @@ API calls to the attested TLS public key.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import http.client
 import json
 import secrets
@@ -287,7 +289,6 @@ def verify_endpoint(
         isinstance(tls_spki, str) and tls_spki.startswith("sha256:"),
         "the evidence is missing tls_spki_sha256",
     )
-
     # The evidence-published receipt key must be the key that signed the
     # attestation receipt (thumbprint == header kid) — this is the key WP-7
     # per-request receipts are verified against.
@@ -308,6 +309,14 @@ def verify_endpoint(
             "the TLS peer of the attestation connection does not match the "
             f"attested SPKI: observed {observed_spki!r}, evidence claims {tls_spki!r}"
         )
+    tls_spki_der = evidence.get("tls_spki_der")
+    _expect(isinstance(tls_spki_der, str) and bool(tls_spki_der), "the evidence is missing tls_spki_der")
+    try:
+        raw_tls_spki = base64.urlsafe_b64decode(tls_spki_der.encode("ascii") + b"=" * ((-len(tls_spki_der)) % 4))
+    except (ValueError, UnicodeError) as exc:
+        raise VerificationError("the evidence tls_spki_der is not base64url") from exc
+    encoded_tls_spki = "sha256:" + base64.urlsafe_b64encode(hashlib.sha256(raw_tls_spki).digest()).rstrip(b"=").decode("ascii")
+    _expect(encoded_tls_spki == tls_spki, "the evidence TLS SPKI DER does not match its fingerprint")
 
     # A receipt is only a signed statement by the proxy. Require an
     # independent verifier for the raw quote/evidence before returning a

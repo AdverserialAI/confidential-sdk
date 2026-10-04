@@ -293,6 +293,12 @@ export const verifyEndpoint = async (
 		if (!tlsSpkiSha256 || !tlsSpkiSha256.startsWith('sha256:')) {
 			throw new Error('The evidence is missing tls_spki_sha256.');
 		}
+		const tlsSpkiDER = asNonEmptyString(evidence.tls_spki_der);
+		if (!tlsSpkiDER) throw new Error('The evidence is missing tls_spki_der.');
+		const tlsSpkiDigest = await crypto.subtle.digest('SHA-256', asArrayBuffer(fromBase64Url(tlsSpkiDER)));
+		if (`sha256:${toBase64Url(new Uint8Array(tlsSpkiDigest))}` !== tlsSpkiSha256) {
+			throw new Error('The evidence TLS SPKI DER does not match its fingerprint.');
+		}
 
 		const workload = asObject(evidence.workload) ?? {};
 		const receiptPublicKey = asObject(evidence.receipt_pubkey_jwk) as JsonWebKey | null;

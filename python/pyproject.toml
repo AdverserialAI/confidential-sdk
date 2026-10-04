@@ -13,6 +13,7 @@ dependencies = ["cryptography>=41"]
 
 [project.scripts]
 adverserial-verify = "adverserial.__main__:main"
+adverserial-hardware-verify = "adverserial.hardware_verifier:main"
 
 [tool.setuptools.packages.find]
 include = ["adverserial*"]

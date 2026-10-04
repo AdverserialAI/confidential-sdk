@@ -35,6 +35,23 @@ return `HardwareVerification(verified=True, verifier="...")`. Deployments
 should provide a reviewed vendor-verifier adapter, such as a DCAP-QVL/TDX
 verifier paired with the applicable GPU-attestation verifier.
 
+## Official hardware-verifier runner
+
+Install the Python package and configure `adverserial-hardware-verify` as the
+gateway's `ADVERSERIAL_HARDWARE_VERIFIER_COMMAND`. It requires two absolute,
+independently reviewed adapter paths: `ADVERSERIAL_TDX_VERIFIER_COMMAND` and
+`ADVERSERIAL_GPU_VERIFIER_COMMAND`. Before either adapter runs, the runner
+recomputes TDX `report_data = SHA-256(nonce || TLS-SPKI-DER || receipt-SPKI-DER)
+|| 32 zero bytes`, validates the TLS public-key fingerprint, and canonicalizes
+the TDX event log and GPU-evidence digests. It accepts only adapter outputs
+that return those exact bindings. It rejects DEV_MODE and missing evidence.
+
+Adapters are deployment-specific by design; the package does not substitute a
+proxy receipt for Intel TDX/DCAP and GPU vendor verification. Their JSON input
+is documented in `adverserial.hardware_verifier`; a real production adapter
+must return a non-empty `verifier` name/version plus the verified binding
+fields.
+
 ## Per-request receipts (WP-7)
 
 Every chat completion through the proxy carries a signed enclave receipt

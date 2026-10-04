@@ -22,10 +22,12 @@ passes through Heroku's existing API shim or GPU proxy.
 pip install ./python ./gateway
 export ADVERSERIAL_RECEIPT_KEYS_FILE="$HOME/.config/adverserial/receipt-keys.json"
 export ADVERSERIAL_HARDWARE_VERIFIER_COMMAND='/absolute/path/to/adverserial-hardware-verify'
+export ADVERSERIAL_TDX_VERIFIER_COMMAND='/absolute/path/to/your-intel-tdx-adapter'
+export ADVERSERIAL_GPU_VERIFIER_COMMAND='/absolute/path/to/your-gpu-attestation-adapter'
 adverserial-confidential-gateway
 ```
 
-The receipt keys and hardware verifier must be obtained from the signed policy
+`adverserial-hardware-verify` validates protocol bindings then invokes both configured vendor adapters; it fails closed unless each validates its portion of raw evidence. The receipt keys and hardware verifier must be obtained from the signed policy
 published at `https://verify.adverserial.ai`. Do not use this gateway until the
 policy identifies a live production endpoint and the independent verifier is
 available.
