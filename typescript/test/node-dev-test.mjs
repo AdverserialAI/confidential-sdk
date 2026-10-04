@@ -28,7 +28,9 @@ import { fileURLToPath } from 'node:url';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PROXY_DIR = path.resolve(HERE, '../../../public-attest-proxy');
+// CI checks out the public proxy alongside this repository. Local developers
+// can either set ATTEST_PROXY_DIR or use the workspace sibling.
+const PROXY_DIR = process.env.ATTEST_PROXY_DIR || path.resolve(HERE, '../../../public-attest-proxy');
 const TMP_DIR = path.join(HERE, '.tmp');
 const BIN = path.join(TMP_DIR, process.platform === 'win32' ? 'attest-proxy.exe' : 'attest-proxy');
 
