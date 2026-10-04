@@ -1,0 +1,122 @@
+# @adverserial/opencode-plugin
+
+[opencode](https://opencode.ai) plugin that lets the agent verify the
+attestation of the Adverserial confidential inference endpoint from inside
+the coding session.
+
+It wraps the TypeScript SDK (`@adverserial/sdk`, `../../typescript`) through
+the shared core in `../shared`: fresh nonce-bound TDX evidence + ES256
+verification receipt, checked against pinned receipt keys. Without pinned
+keys the tools **refuse to claim "verified"**; the explicit escape hatch
+(`ADVERSERIAL_TRUST_EVIDENCE_KEY=1`) TOFU-bootstraps the ephemeral key from
+the evidence and the verdict reads **UNPINNED (TOFU dev mode)**. Production
+deployments pin the key set published at https://verify.adverserial.ai.
+
+## Tools
+
+| Tool | Params | What it does |
+| --- | --- | --- |
+| `adverserial_verify` | none | Runs the attestation check and returns a compact verdict: `VERIFIED` / `FAILED` / unpinned refusal, with endpoint, model, policy, evidence digest, receipt key id, expiry, trust level, and a dev-mode warning when the evidence is synthetic. |
+| `adverserial_status` | none | Shows the current verification state: the cached last verdict plus its age relative to the cache TTL. |
+
+Verification runs **lazily on the first tool call** and is cached for
+**5 minutes**; later calls within the TTL return the cached verdict (marked
+as such).
+
+## Install
+
+```sh
+cd adverserial-sdk/plugins
+npm install
+npm run build            # tsc; output is self-contained (SDK + shared + plugin)
+```
+
+Then register the built plugin with opencode — either project-local
+(`.opencode/plugins/adverserial.ts` in the repo) or global
+(`~/.config/opencode/plugins/adverserial.ts`). The file is a one-line shim
+pointing at the build output:
+
+```ts
+// ~/.config/opencode/plugins/adverserial.ts
+export { AdverserialPlugin as default } from "/absolute/path/to/adverserial-sdk/plugins/opencode/dist/plugins/opencode/src/index.js"
+```
+
+The dist tree is self-contained except for `@opencode-ai/plugin`, which
+opencode resolves for plugin modules; if your setup loads the file outside
+opencode's plugin loader, add a `package.json` next to your opencode config
+with `"dependencies": { "@opencode-ai/plugin": "*" }` (opencode runs
+`bun install` for it at startup) and keep `adverserial-sdk/plugins/node_modules`
+in place.
+
+## Usage inside a session
+
+Ask the agent, e.g.:
+
+> "Verify the Adversarial endpoint before I paste this config."
+> "Is the confidential inference endpoint still attested? What's the evidence digest and expiry?"
+
+The agent calls `adverserial_verify` (or `adverserial_status`) and reports
+the verdict. Example tool output:
+
+```
+ADVERSERIAL ATTESTATION: VERIFIED — UNPINNED (TOFU dev mode)
+  endpoint  https://127.0.0.1:51234/v1
+  model     lordx64/cyberglm
+  policy    adverserial-policy/dev
+  evidence  sha256:…
+  receipt   kid=… digest=sha256:…
+  tls_spki  sha256:…
+  issued    2026-10-04T07:00:00.000Z
+  expires   2026-10-04T07:10:00.000Z (in 9m 32s)
+  trust     UNPINNED (TOFU dev mode) — receipt key bootstrapped from the evidence itself
+  WARNING: the receipt key was trust-on-first-use bootstrapped from the evidence;
+           anyone terminating TLS could present it. Production deployments pin
+           receipt keys from https://verify.adverserial.ai.
+  WARNING: dev_mode evidence (dev=true) — the TDX quote is SYNTHETIC.
+           This proves the plumbing (signatures, nonce, digests), NOT the hardware.
+
+(fresh attestation check)
+```
+
+## Environment
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ADVERSERIAL_API_URL` | `https://cc-api.adverserial.ai/v1` | Endpoint base URL |
+| `ADVERSERIAL_MODEL` | `lordx64/cyberglm` | Expected receipt `model_id` |
+| `ADVERSERIAL_ISSUER` | `https://verify.adverserial.ai` | Expected receipt `iss` |
+| `ADVERSERIAL_AUDIENCE` | `cc-chat.adverserial.ai` | Expected receipt `aud` |
+| `ADVERSERIAL_EXPECTED_ENDPOINT` | unset | Also pin the receipt `endpoint` claim |
+| `ADVERSERIAL_RECEIPT_KEYS_JSON` | unset | Pinned keys: JSON map kid → public JWK |
+| `ADVERSERIAL_RECEIPT_KEYS_FILE` | unset | Path to a JSON file with that map |
+| `ADVERSERIAL_TRUST_EVIDENCE_KEY` | unset | `=1` enables the TOFU dev escape hatch |
+
+Notes:
+
+- The keys file is a JSON object mapping key id → public EC P-256 JWK, e.g.
+  `{"<kid>": {"kty":"EC","crv":"P-256","x":"…","y":"…"}}`. Set only one of
+  `ADVERSERIAL_RECEIPT_KEYS_JSON` / `ADVERSERIAL_RECEIPT_KEYS_FILE`.
+- Set the env in the environment you launch `opencode` from; the plugin
+  reads it once, lazily, on the first tool call.
+- Against a DEV_MODE attest-proxy (self-signed TLS) on loopback, the TOFU
+  escape additionally disables CA validation for the opencode process, with
+  a loud warning in the tool output and plugin log. For a non-loopback
+  self-signed endpoint, export `NODE_TLS_REJECT_UNAUTHORIZED=0` before
+  launching opencode (dev only).
+- Node/Bun fetch cannot pin the TLS SPKI (see the SDK README); the verdict
+  surfaces `tls_spki_sha256`. For hard channel pinning use the Python SDK's
+  `VerifiedSession`.
+
+## Smoke test
+
+With a DEV_MODE attest-proxy running on loopback
+(`cd ../../../attest-proxy && DEV_MODE=1 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy`):
+
+```sh
+cd adverserial-sdk/plugins/opencode
+ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 ADVERSERIAL_TRUST_EVIDENCE_KEY=1 npm test
+ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 npm test -- --expect-unpinned
+```
+
+This drives the exact tool code path (plugin module + tools + TTL cache)
+under plain Node, without the opencode runtime.
