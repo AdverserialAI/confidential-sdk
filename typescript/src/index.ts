@@ -11,7 +11,9 @@ export type {
 } from './verify.js';
 export { createVerifiedOpenAI, VerificationRequiredError } from './openai.js';
 export type { VerifiedOpenAI, VerifiedOpenAIOptions } from './openai.js';
-export { verifyPhalaTDXEvidence } from './phala.js';
+export { createPhalaNVIDIAVerifier, verifyPhalaTDXEvidence } from './phala.js';
+export { verifyNVIDIAEvidence } from './nvidia.js';
+export type { NVIDIAEvidenceOptions, NVIDIAEvidenceResult } from './nvidia.js';
 
 export { verifyInferenceReceipt } from './inference-receipt.js';
 export type { InferenceReceiptProof, VerifyInferenceReceiptOptions } from './inference-receipt.js';

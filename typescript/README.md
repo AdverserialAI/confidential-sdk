@@ -6,14 +6,14 @@ model. DOM WebCrypto + fetch; runs in browsers and Node 18+. No runtime
 dependencies; `tsc` is the only build step.
 
 ```ts
-import { verifyEndpoint, createVerifiedOpenAI } from '@adverserial/sdk';
+import { verifyEndpoint, createPhalaNVIDIAVerifier, createVerifiedOpenAI } from '@adverserial/sdk';
 
 const result = await verifyEndpoint('https://host/v1', {
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys: { [kid]: jwk },
 	issuer: 'https://verify.adverserial.ai',
 	audience: 'cc-chat.adverserial.ai',
-	verifyHardwareEvidence: verifyWithPinnedDcapQvl
+	verifyHardwareEvidence: createPhalaNVIDIAVerifier({ minimumGPUCount: 8 })
 });
 if (result.status === 'verified' && !result.proof.devMode) { /* … */ }
 
@@ -22,7 +22,13 @@ const client = await createVerifiedOpenAI({ baseURL: 'https://host/v1', entitlem
 // verification failed (throws VerificationRequiredError).
 ```
 
-**Hardware-verifier requirement:** `verifyHardwareEvidence` is mandatory. It must validate the raw TDX quote, event log, certificate/HPKE binding, and applicable GPU evidence against a pinned public policy. The SDK fails closed when this verifier is absent or rejects the evidence. A proxy receipt alone is not a hardware proof.
+**Hardware-verifier requirement:** `verifyHardwareEvidence` is mandatory. For the
+Phala 8×H200 profile, use `createPhalaNVIDIAVerifier({ minimumGPUCount: 8 })`.
+It validates Intel's TDX quote through Phala PCCS, binds the quote to the TLS,
+receipt, and EHBP public keys, then validates NVIDIA's detached NRAS EAT bundle
+through NVIDIA's public JWKS: every ES384 signature, the overall verdict,
+freshness, and each GPU-token digest. The SDK fails closed when either chain
+rejects. A proxy receipt alone is not hardware proof.
 
 **TLS pinning limitation:** neither browser fetch nor Node fetch expose the
 peer certificate, so the evidence's `tls_spki_sha256` cannot be enforced on

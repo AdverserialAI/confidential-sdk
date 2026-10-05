@@ -15,6 +15,7 @@ import { getCollateralAndVerify } from '@phala/dcap-qvl';
 import { asArrayBuffer, fromBase64Url } from './canonjson.js';
 import type { HardwareEvidenceVerifier } from './verify.js';
 import type { JsonRecord } from './canonjson.js';
+import { verifyNVIDIAEvidence } from './nvidia.js';
 
 const text = new TextEncoder();
 
@@ -83,3 +84,24 @@ export const verifyPhalaTDXEvidence: HardwareEvidenceVerifier = async ({ evidenc
 
 	return { verified: true, verifier: '@phala/dcap-qvl@0.6.5', tee: 'Intel TDX' };
 };
+
+/**
+ * Creates a complete browser verifier for a Phala TDX + NVIDIA deployment.
+ * It verifies both independent vendor evidence chains before returning a
+ * verified result; callers cannot accidentally present CPU-TEE-only proof as
+ * a complete confidential-GPU proof.
+ */
+export const createPhalaNVIDIAVerifier = (options: { minimumGPUCount: number; maxGPUEvidenceAgeMs?: number } ): HardwareEvidenceVerifier =>
+	async input => {
+		const tdx = await verifyPhalaTDXEvidence(input);
+		const gpu = await verifyNVIDIAEvidence(input.evidence, {
+			minimumGPUCount: options.minimumGPUCount,
+			maxAgeMs: options.maxGPUEvidenceAgeMs
+		});
+		return {
+			verified: true,
+			verifier: `${tdx.verifier}+${gpu.verifier}`,
+			tee: tdx.tee,
+			gpu: `NVIDIA NRAS (${gpu.gpuCount} GPUs)`
+		};
+	};

@@ -52,8 +52,9 @@ attestation, then send inference bodies with the quote-bound RFC 9180/RFC
 ```
 
 Threat model, one sentence: a verified proof **proves the TLS peer is the
-workload whose compose/model digests are in the policy — it does not prove
-the hardware unless the TDX/NVIDIA chains validate, which dev_mode stubs.**
+workload whose compose/model digests are in the policy — and, when the
+complete Phala/NVIDIA verifier is selected, proves the Intel TDX and signed
+NVIDIA NRAS EAT chains too; dev_mode stubs prove neither.**
 
 ## ⚠ DEV MODE
 
