@@ -122,7 +122,7 @@ class Dispatcher:
         outbound.pop("model", None)
         stream = bool(outbound.pop("stream", False))
         outbound["max_tokens"] = max_output
-        session = VerifiedSession(self.config.cc_api_url, proof=proof, api_key=entitlement, timeout=600)
+        session = VerifiedSession(self.config.cc_api_url, proof=proof, entitlement=entitlement, timeout=600)
         return session.chat_completions(outbound.pop("messages", []), model=model, stream=stream, **outbound)
 
     def adapted_completion(self, api_key: str, model: str, payload: Mapping[str, Any]):

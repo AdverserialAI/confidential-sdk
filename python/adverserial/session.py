@@ -35,7 +35,8 @@ from typing import Any, Dict, Generator, Iterable, Iterator, Mapping, Optional
 from urllib.parse import urlsplit
 
 from cryptography.exceptions import InvalidSignature
-
+from ehbp import ServerIdentity
+from ehbp.protocol import ENCAPSULATED_KEY_HEADER, RESPONSE_NONCE_HEADER
 from ._jws import b64url_encode, parse_compact_jws, verify_es256
 from ._tls import PinnedHTTPSConnection
 from .verify import VerificationError, VerifiedProof
@@ -99,7 +100,9 @@ class VerifiedSession:
     Parameters:
         base_url: endpoint base, e.g. "https://host/v1".
         proof: a VerifiedProof returned by verify_endpoint().
-        api_key: sent as `Authorization: Bearer <api_key>` if given.
+        entitlement: short-lived, model-bound billing entitlement sent as
+            `Authorization: Bearer <entitlement>`. A long-lived platform API
+            key must be exchanged at billing and must never enter the CVM.
         timeout: per-request timeout in seconds.
     """
 
@@ -108,9 +111,10 @@ class VerifiedSession:
         base_url: str,
         *,
         proof: VerifiedProof,
-        api_key: Optional[str] = None,
+        entitlement: Optional[str] = None,
         timeout: float = 60.0,
         require_receipts: bool = True,
+        use_ehbp: Optional[bool] = None,
     ) -> None:
         if getattr(proof, "status", None) != "verified":
             raise VerificationError(
@@ -124,9 +128,18 @@ class VerifiedSession:
         self._port = parts.port or 443
         self._base_path = parts.path.rstrip("/")
         self._proof = proof
-        self._api_key = api_key
+        self._entitlement = entitlement
         self._timeout = timeout
         self._require_receipts = require_receipts
+        # A proof with a quote-bound EHBP key automatically selects encrypted
+        # request/response transport. Explicit false exists only for migration
+        # testing against an older non-EHBP endpoint; a production EHBP-required
+        # proxy rejects that downgrade.
+        self._use_ehbp = bool(proof.ehbp_key_config) if use_ehbp is None else use_ehbp
+        if self._use_ehbp and not proof.ehbp_key_config:
+            raise VerificationError("EHBP was requested but the verified evidence has no EHBP key configuration")
+        if self._use_ehbp and not self._entitlement:
+            raise VerificationError("a short-lived confidential entitlement is required; do not send a platform API key to the CVM")
         if require_receipts and not proof.attestation_state_digest:
             raise VerificationError("VerifiedSession requires attestation_state_digest to verify inference receipts")
 
@@ -148,8 +161,8 @@ class VerifiedSession:
 
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers = {"Accept": "application/json"}
-        if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+        if self._entitlement:
+            headers["Authorization"] = f"Bearer {self._entitlement}"
         if extra:
             headers.update(extra)
         return headers
@@ -205,8 +218,58 @@ class VerifiedSession:
         body = json.dumps(payload).encode("utf-8")
         nonce = self._new_request_nonce()
         if stream:
+            if self._use_ehbp:
+                return self._ehbp_stream(body, nonce, payload["model"])
             return self._stream(body, nonce, payload["model"])
+        if self._use_ehbp:
+            return self._ehbp_completion(body, nonce, payload["model"])
         return self._completion(body, nonce, payload["model"])
+
+    def _ehbp_identity(self) -> ServerIdentity:
+        if not self._proof.ehbp_key_config:
+            raise VerificationError("EHBP requires an attested receiver key configuration")
+        try:
+            return ServerIdentity.unmarshal_public_config(self._proof.ehbp_key_config)
+        except Exception as exc:  # reference library exposes several concrete errors
+            raise VerificationError("the attested EHBP key configuration is invalid") from exc
+
+    def _ehbp_completion(self, body: bytes, nonce: Optional[str], model_id: str) -> CompletionResponse:
+        """Use the maintained EHBP reference framing over a hard-SPKI-pinned TLS connection."""
+        if nonce is None:
+            raise VerificationError("EHBP requires a fresh request nonce")
+        try:
+            encrypted = self._ehbp_identity().encrypt_request_body(body)
+        except Exception as exc:
+            raise VerificationError("could not encrypt the confidential request") from exc
+        if encrypted is None:
+            raise VerificationError("a confidential completion request must not be empty")
+        connection = self._connect()
+        try:
+            headers = self._headers({"Content-Type": "application/json", "X-Adverserial-Nonce": nonce})
+            headers[ENCAPSULATED_KEY_HEADER] = encrypted.encapsulated_key.hex()
+            connection.request("POST", self._base_path + "/chat/completions", body=encrypted.body, headers=headers)
+            response = connection.getresponse()
+            wire_body = response.read()
+            receipt_token = response.getheader("X-Adverserial-Receipt")
+            if response.status != 200:
+                raise VerificationError(f"POST /chat/completions failed with HTTP {response.status}: {wire_body[:200].decode('utf-8', 'replace')}")
+            try:
+                response_nonce = response.getheader(RESPONSE_NONCE_HEADER)
+                if not response_nonce:
+                    raise ValueError("missing EHBP response nonce")
+                data = encrypted.token.decrypt_response_body(bytes.fromhex(response_nonce), wire_body)
+            except (ValueError, TypeError) as exc:
+                raise VerificationError("could not decrypt authenticated confidential response") from exc
+            claims: Optional[Dict[str, Any]] = None
+            verified = False
+            if receipt_token:
+                claims = self._verify_request_receipt(token=receipt_token, request_nonce=nonce, request_body=body, response_hash=_sha256_b64(data), model_id=model_id)
+                verified = True
+            elif self._require_receipts:
+                raise VerificationError("the confidential endpoint did not return a signed inference receipt")
+            return CompletionResponse(json.loads(data), receipt_verified=verified, receipt_claims=claims)
+        finally:
+            connection.close()
 
     # --- non-streaming with receipt header ---------------------------------
 
@@ -247,6 +310,97 @@ class VerifiedSession:
             connection.close()
 
     # --- streaming with final receipt chunk ---------------------------------
+
+    def _ehbp_stream(self, body: bytes, nonce: Optional[str], model_id: str) -> ReceiptStream:
+        """Stream an SSE response through standard EHBP framed decryption.
+
+        No plaintext fallback is possible: a successful response without the
+        protocol response nonce is rejected before any model bytes are yielded.
+        """
+        if nonce is None:
+            raise VerificationError("EHBP requires a fresh request nonce")
+        try:
+            encrypted = self._ehbp_identity().encrypt_request_body(body)
+        except Exception as exc:
+            raise VerificationError("could not encrypt the confidential request") from exc
+        if encrypted is None:
+            raise VerificationError("a confidential completion request must not be empty")
+        connection = self._connect()
+        headers = self._headers({"Content-Type": "application/json", "Accept": "text/event-stream", "X-Adverserial-Nonce": nonce})
+        headers[ENCAPSULATED_KEY_HEADER] = encrypted.encapsulated_key.hex()
+        connection.request("POST", self._base_path + "/chat/completions", body=encrypted.body, headers=headers)
+        response = connection.getresponse()
+        if response.status != 200:
+            data = response.read()
+            connection.close()
+            raise VerificationError(
+                f"POST /chat/completions failed with HTTP {response.status}: "
+                f"{data[:200].decode('utf-8', 'replace')}"
+            )
+        nonce_header = response.getheader(RESPONSE_NONCE_HEADER)
+        if not nonce_header:
+            connection.close()
+            raise VerificationError("the confidential endpoint returned a successful plaintext response")
+        try:
+            decryptor = encrypted.token.create_response_decryptor(bytes.fromhex(nonce_header))
+        except (TypeError, ValueError) as exc:
+            connection.close()
+            raise VerificationError("the confidential endpoint supplied an invalid EHBP response nonce") from exc
+
+        stream = ReceiptStream()
+
+        def events() -> Generator[Any, None, None]:
+            hasher = hashlib.sha256()
+            receipt_token: Optional[str] = None
+            buffer = b""
+            done = False
+            try:
+                while not done:
+                    wire_chunk = response.read1(4096)
+                    if not wire_chunk:
+                        break
+                    for chunk in decryptor.push(wire_chunk):
+                        buffer += chunk
+                        while b"\n" in buffer:
+                            line, buffer = buffer.split(b"\n", 1)
+                            if line.endswith(b"\r"):
+                                line = line[:-1]
+                            if not line or line.startswith(b":") or not line.startswith(b"data:"):
+                                continue
+                            payload = line[len(b"data:") :]
+                            if payload.startswith(b" "):
+                                payload = payload[1:]
+                            if payload == b"[DONE]":
+                                hasher.update(payload)
+                                done = True
+                                break
+                            parsed = json.loads(payload)
+                            if isinstance(parsed, dict) and "adverserial_receipt" in parsed:
+                                token = parsed["adverserial_receipt"]
+                                if not isinstance(token, str):
+                                    raise VerificationError("malformed adverserial_receipt chunk")
+                                receipt_token = token
+                                continue
+                            hasher.update(payload)
+                            yield parsed
+                decryptor.finish()
+            finally:
+                connection.close()
+            if receipt_token is not None:
+                claims = self._verify_request_receipt(
+                    token=receipt_token,
+                    request_nonce=nonce,
+                    request_body=body,
+                    response_hash="sha256:" + b64url_encode(hasher.digest()),
+                    model_id=model_id,
+                )
+                stream.receipt_verified = True
+                stream.receipt_claims = claims
+            elif self._require_receipts:
+                raise VerificationError("the confidential endpoint did not return a signed inference receipt")
+
+        stream._generator = events()
+        return stream
 
     def _stream(self, body: bytes, nonce: Optional[str], model_id: str) -> ReceiptStream:
         connection = self._connect()

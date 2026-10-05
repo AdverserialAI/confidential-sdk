@@ -17,7 +17,7 @@ const result = await verifyEndpoint('https://host/v1', {
 });
 if (result.status === 'verified' && !result.proof.devMode) { /* … */ }
 
-const client = await createVerifiedOpenAI({ baseURL: 'https://host/v1', apiKey: 'sk-…', ... });
+const client = await createVerifiedOpenAI({ baseURL: 'https://host/v1', entitlement: '<short-lived-JWS>', ... });
 // client.fetchImpl injects Authorization and refuses to send when
 // verification failed (throws VerificationRequiredError).
 ```

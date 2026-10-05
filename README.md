@@ -2,8 +2,8 @@
 
 Client-side verification SDK for **Adverserial confidential-inference
 endpoints** ([attest-proxy](../attest-proxy)). Verify an endpoint's
-attestation, then send API calls over a channel pinned to the attested TLS
-key. Two implementations, one protocol:
+attestation, then send inference bodies with the quote-bound RFC 9180/RFC
+9458 EHBP key configuration. Two implementations, one protocol:
 
 - [`python/`](python/) — package `adverserial` (stdlib + `cryptography`;
   no `requests`/`openai` dependencies). Full verification **plus TLS SPKI
@@ -20,7 +20,9 @@ key. Two implementations, one protocol:
    |  GET /attestation?nonce=<fresh 32B base64url>      |
    |--------------------------------------------------->|
    |        fresh TDX quote: report_data = SHA256(      |
-   |          nonce ‖ tls_spki_der ‖ receipt_spki_der)  |
+   |          "adverserial-attestation-v2\\0" ‖ nonce  |
+   |          ‖ tls_spki_der ‖ receipt_spki_der         |
+   |          ‖ ehbp_receiver_public_key)               |
    |                                                    |
    |  { evidence, verification_receipt }                |
    |<---------------------------------------------------|
@@ -36,10 +38,13 @@ key. Two implementations, one protocol:
    |     sha256(canonicalize(evidence)))                |
    |     canonicalize = keys sorted recursively, no     |
    |     whitespace, JSON.stringify string semantics    |
-   |  4. Python only: SPKI(sha256) of the TLS peer cert |
+   |  4. Validate RFC 9458 EHBP config and its public   |
+   |     key digest from quote-bound evidence            |
+   |  5. Python only: SPKI(sha256) of the TLS peer cert |
    |     == evidence.tls_spki_sha256                    |
    |                                                    |
-   |  POST /v1/chat/completions (Authorization: …)      |
+   |  POST /v1/chat/completions (EHBP encrypted body +  |
+   |  short-lived billing entitlement)                  |
    |  Python: over a connection pinned to the attested  |
    |  SPKI — a substituted cert fails before any bytes  |
    |  are sent                                          |
@@ -74,7 +79,7 @@ proof = verify_endpoint(
 proof.dev_mode          # True => synthetic plumbing proof, NOT hardware
 proof.tls_spki_sha256   # "sha256:<base64url>" — the channel pin
 
-session = VerifiedSession("https://host/v1", proof=proof, api_key="sk-...")
+session = VerifiedSession("https://host/v1", proof=proof, entitlement="<short-lived-JWS>")
 resp = session.chat_completions(messages=[{"role": "user", "content": "hi"}])
 # every request goes over TLS pinned to the attested SPKI; a substituted
 # certificate raises TLSPinMismatchError before any request bytes are sent
@@ -124,7 +129,7 @@ const result = await verifyEndpoint('https://host/v1', {
 
 const client = await createVerifiedOpenAI({
 	baseURL: 'https://host/v1',
-	apiKey: 'sk-...',
+	entitlement: '<short-lived-JWS>',
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys,
 	issuer: 'https://verify.adverserial.ai',
@@ -132,7 +137,7 @@ const client = await createVerifiedOpenAI({
 });
 // client.fetchImpl is fetch-compatible, injects Authorization, and REFUSES
 // to send (throws VerificationRequiredError) when verification failed:
-const openai = new OpenAI({ baseURL: client.baseURL, fetch: client.fetchImpl, apiKey: 'sk-...' });
+const openai = new OpenAI({ baseURL: client.baseURL, fetch: client.fetchImpl, apiKey: 'local-placeholder' });
 ```
 
 Build: `cd typescript && npm install && npm run build` (tsc only).
@@ -140,6 +145,10 @@ Integration test: `npm test` — builds the **real attest-proxy** with
 `DEV_MODE=1`, runs it on a loopback port, and verifies against it (including
 a cross-check that the SDK's canonical evidence digest equals the Go-signed
 `evidence_sha256` claim), then kills it.
+
+`createVerifiedOpenAI()` replaces any `Authorization` header supplied by an
+OpenAI client with the short-lived entitlement. Do not supply a long-lived
+platform API key to `cc-api`; exchange it at billing/identity first.
 
 **TLS pinning limitation (TS):** neither the browser fetch API nor Node's
 fetch expose the peer certificate, so `fetchImpl` cannot enforce
@@ -159,6 +168,15 @@ boot** until KMS sealing lands, so today the key is published in the
 evidence as `receipt_pubkey_jwk`; bootstrapping trust from that (the CLI's
 `--trust-evidence-key`, the node test's TOFU step) is a development
 convenience, not a security boundary.
+
+## EHBP transport
+
+The SDK uses the maintained MIT-licensed
+[Tinfoil EHBP reference implementation](https://github.com/tinfoilsh/encrypted-http-body-protocol)
+instead of an Adverserial-specific encryption format. It encrypts request
+bodies and framed streaming responses with HPKE. The SDK never discovers a
+key from the network after verification: it uses only the RFC 9458 key config
+embedded in fresh quote-bound evidence.
 
 ## Security
 

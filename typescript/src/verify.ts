@@ -18,6 +18,7 @@
  */
 
 import { asArrayBuffer, evidenceDigest, fromBase64Url, sha256Digest, toBase64Url } from './canonjson.js';
+import { Identity } from 'ehbp';
 import type { JsonRecord } from './canonjson.js';
 
 export type TrustedReceiptKeys = Record<string, JsonWebKey>;
@@ -98,6 +99,9 @@ export type VerifiedProof = {
 	receiptPublicKey: JsonWebKey;
 	/** Stable attestation state referenced by signed inference receipts. */
 	attestationStateDigest: string;
+	/** Quote-bound RFC 9458 EHBP key configuration for encrypted HTTP bodies. */
+	ehbpKeyConfig?: Uint8Array;
+	ehbpPublicKeySha256?: string;
 };
 
 export type VerificationResult =
@@ -307,6 +311,29 @@ export const verifyEndpoint = async (
 		}
 		const attestationStateDigest = asNonEmptyString(evidence.attestation_state_digest);
 		if (!attestationStateDigest?.startsWith('sha256:')) throw new Error('The evidence is missing attestation_state_digest.');
+		let ehbpKeyConfig: Uint8Array | undefined;
+		let ehbpPublicKeySha256: string | undefined;
+		if (evidence.ehbp !== undefined && evidence.ehbp !== null) {
+			const metadata = asObject(evidence.ehbp);
+			const keyConfig = metadata ? asNonEmptyString(metadata.key_config) : null;
+			const advertisedPublicKey = metadata ? asNonEmptyString(metadata.public_key) : null;
+			ehbpPublicKeySha256 = metadata ? asNonEmptyString(metadata.public_key_sha256) ?? undefined : undefined;
+			if (!keyConfig || !advertisedPublicKey || !ehbpPublicKeySha256?.startsWith('sha256:')) {
+				throw new Error('The evidence EHBP key configuration is incomplete.');
+			}
+			ehbpKeyConfig = fromBase64Url(keyConfig);
+			const advertised = fromBase64Url(advertisedPublicKey);
+			const advertisedDigest = await crypto.subtle.digest('SHA-256', asArrayBuffer(advertised));
+			if (`sha256:${toBase64Url(new Uint8Array(advertisedDigest))}` !== ehbpPublicKeySha256) {
+				throw new Error('The evidence EHBP public-key digest does not match.');
+			}
+			const identity = await Identity.unmarshalPublicConfig(ehbpKeyConfig);
+			const configuredKey = await identity.getPublicKeyHex();
+			const advertisedKey = Array.from(advertised, (byte) => byte.toString(16).padStart(2, '0')).join('');
+			if (configuredKey !== advertisedKey) {
+				throw new Error('The evidence EHBP key configuration does not contain its quote-bound public key.');
+			}
+		}
 		return {
 			status: 'verified',
 			proof: {
@@ -331,7 +358,9 @@ export const verifyEndpoint = async (
 				devMode: evidence.dev === true,
 				hardwareVerifier: hardware.verifier,
 				receiptPublicKey,
-				attestationStateDigest
+				attestationStateDigest,
+				ehbpKeyConfig,
+				ehbpPublicKeySha256
 			}
 		};
 	} catch (error) {

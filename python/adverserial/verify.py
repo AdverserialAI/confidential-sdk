@@ -104,6 +104,11 @@ class VerifiedProof:
     receipt_jwk: Optional[Dict[str, Any]] = None
     # Name/version of the independent verifier that accepted raw evidence.
     hardware_verifier: Optional[str] = None
+    # RFC 9458 EHBP receiver configuration, validated from attested evidence.
+    # When present, VerifiedSession uses the reference EHBP transport rather
+    # than allowing a plaintext request-body fallback.
+    ehbp_key_config: Optional[bytes] = None
+    ehbp_public_key_sha256: Optional[str] = None
 
 
 def _iso(epoch: int) -> str:
@@ -318,6 +323,34 @@ def verify_endpoint(
     encoded_tls_spki = "sha256:" + base64.urlsafe_b64encode(hashlib.sha256(raw_tls_spki).digest()).rstrip(b"=").decode("ascii")
     _expect(encoded_tls_spki == tls_spki, "the evidence TLS SPKI DER does not match its fingerprint")
 
+    # The encrypted-body receiver key is quote-bound by the v2 attestation
+    # report-data construction. Validate the public representation here; the
+    # independent hardware verifier validates that quote binding itself.
+    ehbp_key_config: Optional[bytes] = None
+    ehbp_public_key_sha256: Optional[str] = None
+    if evidence.get("ehbp") is not None:
+        try:
+            from ehbp import ServerIdentity
+
+            metadata = evidence["ehbp"]
+            if not isinstance(metadata, Mapping):
+                raise ValueError("EHBP metadata is not an object")
+            key_config = metadata.get("key_config")
+            public_key = metadata.get("public_key")
+            key_digest = metadata.get("public_key_sha256")
+            if not all(isinstance(value, str) and value for value in (key_config, public_key, key_digest)):
+                raise ValueError("EHBP key configuration is incomplete")
+            ehbp_key_config = b64url_decode(key_config)
+            advertised_key = b64url_decode(public_key)
+            if "sha256:" + b64url_encode(hashlib.sha256(advertised_key).digest()) != key_digest:
+                raise ValueError("EHBP public-key digest is invalid")
+            identity = ServerIdentity.unmarshal_public_config(ehbp_key_config)
+            if identity.public_key_bytes() != advertised_key:
+                raise ValueError("EHBP config does not contain the advertised public key")
+            ehbp_public_key_sha256 = key_digest
+        except (ImportError, KeyError, TypeError, ValueError) as exc:
+            raise VerificationError("the evidence EHBP receiver key is invalid") from exc
+
     # A receipt is only a signed statement by the proxy. Require an
     # independent verifier for the raw quote/evidence before returning a
     # proof marked verified. This is deliberately injected so the SDK can
@@ -358,4 +391,6 @@ def verify_endpoint(
         attestation_state_digest=evidence.get("attestation_state_digest") if isinstance(evidence.get("attestation_state_digest"), str) else None,
         receipt_jwk=receipt_jwk,
         hardware_verifier=hardware.verifier,
+        ehbp_key_config=ehbp_key_config,
+        ehbp_public_key_sha256=ehbp_public_key_sha256,
     )

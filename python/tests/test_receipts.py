@@ -43,7 +43,7 @@ class ReceiptTests(unittest.TestCase):
             hardware_verifier=test_hardware_verifier,
             allow_dev_mode=True,
         )
-        return VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test-key-123")
+        return VerifiedSession(fake.v1_url, proof=proof, entitlement="sk-test-key-123")
 
     def test_non_stream_happy_path(self):
         with FakeAttestProxy() as fake:
@@ -120,7 +120,7 @@ class ReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(VerificationError, "did not return a signed inference receipt"):
                 strict.chat_completions(MESSAGES)
             proof = strict.proof
-            session = VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test-key-123", require_receipts=False)
+            session = VerifiedSession(fake.v1_url, proof=proof, entitlement="sk-test-key-123", require_receipts=False)
             resp = session.chat_completions(MESSAGES)
             self.assertFalse(resp.receipt_verified)
             self.assertIsNone(resp.receipt_claims)

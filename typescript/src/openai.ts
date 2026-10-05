@@ -6,23 +6,23 @@
  * injects the Authorization header and REFUSES to send anything when
  * verification failed — no proof, no prompts.
  *
- * TLS PINNING LIMITATION: neither the browser fetch API nor Node's fetch
- * expose the peer certificate, so this wrapper cannot enforce the evidence's
- * tls_spki_sha256 on API requests. In the browser, confidentiality relies on
- * WSS/TLS to the attested origin plus the nonce-bound evidence; in Node the
- * same limitation applies (undici does not expose the peer SPKI). Use the
- * Python SDK (VerifiedSession) where hard SPKI pinning on the data path is a
- * requirement.
+ * TLS PINNING LIMITATION: neither browser nor Node fetch exposes the peer
+ * certificate for hard SPKI pinning. When the verified evidence contains an
+ * RFC 9458 EHBP key configuration, this wrapper encrypts request and response
+ * bodies to that quote-bound key, including streaming responses, so a TLS
+ * terminator cannot read them. The
+ * Python SDK additionally pins the live TLS SPKI before it sends any bytes.
  */
 
 import { verifyEndpoint } from './verify.js';
 import type { HardwareEvidenceVerifier, TrustedReceiptKeys, VerifiedProof } from './verify.js';
+import { Identity, Transport } from 'ehbp';
 
 export type VerifiedOpenAIOptions = {
 	/** Endpoint base URL, e.g. "https://host/v1". */
 	baseURL: string;
-	/** Sent as `Authorization: Bearer <apiKey>` on every request. */
-	apiKey?: string;
+	/** Short-lived, model-bound billing entitlement sent to the CVM. Never pass a platform API key here. */
+	entitlement?: string;
 	expectedModelId: string;
 	trustedReceiptKeys: TrustedReceiptKeys;
 	issuer: string;
@@ -61,6 +61,24 @@ export class VerificationRequiredError extends Error {
 	}
 }
 
+const encryptedFetch = async (
+	proof: VerifiedProof,
+	innerFetch: typeof fetch,
+	input: RequestInfo | URL,
+	init?: RequestInit
+): Promise<Response> => {
+	if (!proof.ehbpKeyConfig) throw new VerificationRequiredError('the verified evidence has no EHBP key configuration');
+	const request = new Request(input, init);
+	if (request.method === 'GET' || request.method === 'HEAD' || request.body === null) {
+		return innerFetch(request);
+	}
+	// Use the maintained MIT-licensed EHBP reference implementation. Its
+	// streaming frame format and downgrade handling are interoperable with the
+	// proxy; the key config is quote-bound above, so discovery is forbidden.
+	const identity = await Identity.unmarshalPublicConfig(proof.ehbpKeyConfig);
+	return new Transport(identity, new URL(request.url).host).request(request);
+};
+
 export const createVerifiedOpenAI = async (
 	options: VerifiedOpenAIOptions
 ): Promise<VerifiedOpenAI> => {
@@ -72,8 +90,15 @@ export const createVerifiedOpenAI = async (
 	const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
 		if (!proof) throw new VerificationRequiredError(reason ?? 'verification failed');
 		const headers = new Headers(init?.headers);
-		if (options.apiKey) headers.set('Authorization', `Bearer ${options.apiKey}`);
-		return innerFetch(input, { ...init, headers });
+		// Do not allow an OpenAI client's long-lived API key to cross this
+		// boundary. The CVM receives only a short-lived model-bound entitlement.
+		headers.delete('Authorization');
+		if (!options.entitlement) throw new VerificationRequiredError('a short-lived confidential entitlement is required');
+		headers.set('Authorization', `Bearer ${options.entitlement}`);
+		const requestInit = { ...init, headers };
+		return proof.ehbpKeyConfig
+			? encryptedFetch(proof, innerFetch, input, requestInit)
+			: innerFetch(input, requestInit);
 	}) as typeof fetch;
 
 	return {

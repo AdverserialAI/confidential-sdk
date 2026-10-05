@@ -213,7 +213,7 @@ class SessionTests(unittest.TestCase):
                 hardware_verifier=test_hardware_verifier,
                 allow_dev_mode=True,
             )
-            session = VerifiedSession(fake.v1_url, proof=proof, api_key="sk-test")
+            session = VerifiedSession(fake.v1_url, proof=proof, entitlement="sk-test")
             response = session.chat_completions(
                 messages=[{"role": "user", "content": "ping"}]
             )
@@ -255,7 +255,7 @@ class SessionTests(unittest.TestCase):
                 hardware_verifier=test_hardware_verifier,
                 allow_dev_mode=True,
             )
-            session = VerifiedSession(evil.v1_url, proof=proof, api_key="sk-test")
+            session = VerifiedSession(evil.v1_url, proof=proof, entitlement="sk-test")
             with self.assertRaises(TLSPinMismatchError):
                 session.chat_completions(messages=[{"role": "user", "content": "ping"}])
 

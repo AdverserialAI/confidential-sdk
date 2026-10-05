@@ -184,7 +184,7 @@ try {
 	// 7. createVerifiedOpenAI: verified wrapper issues authorized requests.
 	const verifiedClient = await createVerifiedOpenAI({
 		baseURL: `${base}/v1`,
-		apiKey: 'sk-test',
+		entitlement: 'test-entitlement',
 		...verifyOptions
 	});
 	assert.equal(verifiedClient.verified, true);
@@ -197,7 +197,7 @@ try {
 	// 8. createVerifiedOpenAI: failed verification => fetchImpl refuses.
 	const brokenClient = await createVerifiedOpenAI({
 		baseURL: `${base}/v1`,
-		apiKey: 'sk-test',
+		entitlement: 'test-entitlement',
 		...verifyOptions,
 		trustedReceiptKeys: {}
 	});

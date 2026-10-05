@@ -36,8 +36,8 @@ class CoreTests(unittest.TestCase):
             result = self.dispatcher.completion("sk-" + "x" * 24, payload)
         self.assertEqual(result, {"id": "ok"})
         self.assertEqual(entitlement.call_args.args[0], "sk-" + "x" * 24)
-        self.assertEqual(session.call_args.kwargs["api_key"], "signed-entitlement")
-        self.assertNotEqual(session.call_args.kwargs["api_key"], entitlement.call_args.args[0])
+        self.assertEqual(session.call_args.kwargs["entitlement"], "signed-entitlement")
+        self.assertNotEqual(session.call_args.kwargs["entitlement"], entitlement.call_args.args[0])
         self.assertEqual(session.return_value.chat_completions.call_args.kwargs["model"], "lordx64/cyberglm")
 
     def test_gateway_forwards_stream_flag_to_verified_session(self):

@@ -11,6 +11,11 @@ export type {
 } from './verify.js';
 export { createVerifiedOpenAI, VerificationRequiredError } from './openai.js';
 export type { VerifiedOpenAI, VerifiedOpenAIOptions } from './openai.js';
+export { verifyPhalaTDXEvidence } from './phala.js';
 
 export { verifyInferenceReceipt } from './inference-receipt.js';
 export type { InferenceReceiptProof, VerifyInferenceReceiptOptions } from './inference-receipt.js';
+
+// EHBP transport support is provided by the maintained MIT-licensed `ehbp`
+// reference package from Tinfoil. Use createVerifiedOpenAI() with a verified
+// quote-bound key configuration instead of supplying a separately fetched key.

@@ -11,7 +11,7 @@ Usage:
         issuer="https://verify.adverserial.ai",
         audience="cc-chat.adverserial.ai",
     )
-    session = VerifiedSession("https://host/v1", proof=proof, api_key="sk-...")
+    session = VerifiedSession("https://host/v1", proof=proof, entitlement="<short-lived-JWS>")
     response = session.chat_completions(messages=[...])
 
 If proof.dev_mode is True the attestation evidence was synthetic: it proves

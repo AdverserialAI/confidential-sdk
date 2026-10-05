@@ -15,7 +15,7 @@ proof = verify_endpoint(
     audience="cc-chat.adverserial.ai",
     hardware_verifier=verify_hardware_evidence,
 )
-session = VerifiedSession("https://host/v1", proof=proof, api_key="sk-...")
+session = VerifiedSession("https://host/v1", proof=proof, entitlement="<short-lived-JWS>")
 resp = session.chat_completions(messages=[{"role": "user", "content": "hi"}])
 ```
 
