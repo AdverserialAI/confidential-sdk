@@ -40,7 +40,7 @@ const { verifyEndpoint, createVerifiedOpenAI, canonicalize, evidenceDigest } = a
 
 const MODEL = 'lordx64/cyberglm';
 const ISSUER = 'https://verify.adverserial.ai';
-const AUDIENCE = 'https://cc-chat.adverserial.ai';
+const AUDIENCE = 'https://chat.adverserial.ai';
 
 const freePort = () =>
 	new Promise((resolve, reject) => {

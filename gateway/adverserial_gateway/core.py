@@ -52,7 +52,7 @@ class Dispatcher:
             return cached.proof  # type: ignore[return-value]
         try:
             # The proxy signs the receipt's endpoint claim with the bare origin
-            # (e.g. https://cc-api.adverserial.ai), while cc_api_url carries the
+            # (e.g. https://api.adverserial.ai), while cc_api_url carries the
             # /v1 suffix for the OpenAI API; compare against the origin.
             parts = urlsplit(self.config.cc_api_url)
             expected_endpoint = f"{parts.scheme}://{parts.netloc}"

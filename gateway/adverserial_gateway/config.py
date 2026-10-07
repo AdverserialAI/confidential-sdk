@@ -72,10 +72,10 @@ class Config:
         return cls(
             listen_host=host,
             listen_port=port,
-            cc_api_url=_https_url("ADVERSERIAL_CC_API_URL", env.get("ADVERSERIAL_CC_API_URL", "https://cc-api.adverserial.ai/v1")),
+            cc_api_url=_https_url("ADVERSERIAL_CC_API_URL", env.get("ADVERSERIAL_CC_API_URL", "https://api.adverserial.ai/v1")),
             billing_url=_https_url("ADVERSERIAL_BILLING_URL", env.get("ADVERSERIAL_BILLING_URL", "https://billing.adverserial.ai")),
             issuer=env.get("ADVERSERIAL_ISSUER", "https://verify.adverserial.ai"),
-            audience=env.get("ADVERSERIAL_AUDIENCE", "https://cc-chat.adverserial.ai"),
+            audience=env.get("ADVERSERIAL_AUDIENCE", "https://chat.adverserial.ai"),
             receipt_keys=data,
             hardware_verifier_command=command,
             max_input_tokens=_positive_int("ADVERSERIAL_MAX_INPUT_TOKENS", env.get("ADVERSERIAL_MAX_INPUT_TOKENS", "1048576"), 1048576),

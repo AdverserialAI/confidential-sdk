@@ -75,7 +75,7 @@ proof = verify_endpoint(
     expected_model_id="lordx64/cyberglm",
     trusted_receipt_keys={kid: jwk},            # pinned out-of-band
     issuer="https://verify.adverserial.ai",
-    audience="https://cc-chat.adverserial.ai",
+    audience="https://chat.adverserial.ai",
 )
 proof.dev_mode          # True => synthetic plumbing proof, NOT hardware
 proof.tls_spki_sha256   # "sha256:<base64url>" — the channel pin
@@ -123,7 +123,7 @@ const result = await verifyEndpoint('https://host/v1', {
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys: { [kid]: jwk },   // pinned out-of-band
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'https://cc-chat.adverserial.ai'
+	audience: 'https://chat.adverserial.ai'
 });
 // result: { status: 'verified', proof } | { status: 'failed', reason }
 // proof.devMode — synthetic plumbing proof warning, as above
@@ -134,7 +134,7 @@ const client = await createVerifiedOpenAI({
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys,
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'https://cc-chat.adverserial.ai'
+	audience: 'https://chat.adverserial.ai'
 });
 // client.fetchImpl is fetch-compatible, injects Authorization, and REFUSES
 // to send (throws VerificationRequiredError) when verification failed:
@@ -149,7 +149,7 @@ a cross-check that the SDK's canonical evidence digest equals the Go-signed
 
 `createVerifiedOpenAI()` replaces any `Authorization` header supplied by an
 OpenAI client with the short-lived entitlement. Do not supply a long-lived
-platform API key to `cc-api`; exchange it at billing/identity first.
+platform API key to `api.adverserial.ai`; exchange it at billing/identity first.
 
 **TLS pinning limitation (TS):** neither the browser fetch API nor Node's
 fetch expose the peer certificate, so `fetchImpl` cannot enforce

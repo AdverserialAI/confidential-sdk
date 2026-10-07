@@ -9,11 +9,11 @@ and independent TDX/GPU verifier all pass.
 
 ```
 client → 127.0.0.1 gateway → billing.adverserial.ai /cc/entitlements
-                           → cc-api.adverserial.ai (direct TLS, CVM)
+                           → api.adverserial.ai (direct TLS, CVM)
 ```
 
 The raw `sk-…` key ends at billing. The gateway receives an opaque five-minute,
-single-request entitlement and sends that to `cc-api`; the model request never
+single-request entitlement and sends that to `api.adverserial.ai`; the model request never
 passes through Heroku's existing API shim or GPU proxy.
 
 ## Install

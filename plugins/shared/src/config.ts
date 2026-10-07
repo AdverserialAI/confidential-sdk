@@ -14,16 +14,16 @@
 import { readFileSync } from 'node:fs';
 import type { TrustedReceiptKeys } from '../../../typescript/src/index.js';
 
-export const DEFAULT_BASE_URL = 'https://cc-api.adverserial.ai/v1';
+export const DEFAULT_BASE_URL = 'https://api.adverserial.ai/v1';
 export const DEFAULT_MODEL_ID = 'lordx64/cyberglm';
 export const DEFAULT_ISSUER = 'https://verify.adverserial.ai';
-export const DEFAULT_AUDIENCE = 'https://cc-chat.adverserial.ai';
+export const DEFAULT_AUDIENCE = 'https://chat.adverserial.ai';
 export const KEYS_URL = 'https://verify.adverserial.ai';
 
 export type CoreEnv = Record<string, string | undefined>;
 
 export type CoreConfig = {
-	/** Endpoint base URL under test, e.g. "https://cc-api.adverserial.ai/v1". */
+	/** Endpoint base URL under test, e.g. "https://api.adverserial.ai/v1". */
 	baseURL: string;
 	/** Expected receipt claim `model_id`. */
 	modelId: string;

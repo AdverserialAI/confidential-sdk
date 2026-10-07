@@ -9,7 +9,7 @@ Usage:
         expected_model_id="lordx64/cyberglm",
         trusted_receipt_keys={kid: jwk},
         issuer="https://verify.adverserial.ai",
-        audience="https://cc-chat.adverserial.ai",
+        audience="https://chat.adverserial.ai",
     )
     session = VerifiedSession("https://host/v1", proof=proof, entitlement="<short-lived-JWS>")
     response = session.chat_completions(messages=[...])

@@ -65,7 +65,7 @@ The verifier CLI itself is built from this repository's plugins workspace
 ## Environment
 
 ```sh
-export ADVERSERIAL_API_URL='https://cc-api.adverserial.ai/v1'          # default
+export ADVERSERIAL_API_URL='https://api.adverserial.ai/v1'             # default
 export ADVERSERIAL_MODEL='lordx64/cyberglm'                            # default
 export ADVERSERIAL_RECEIPT_KEYS_FILE="$HOME/.config/adverserial/receipt-keys.json"
 export ADVERSERIAL_HARDWARE_VERIFIER_COMMAND='/absolute/path/to/adverserial-hardware-verify'

@@ -29,7 +29,7 @@ from adverserial import (  # noqa: E402
 
 MODEL = "lordx64/cyberglm"
 ISSUER = "https://verify.adverserial.ai"
-AUDIENCE = "https://cc-chat.adverserial.ai"
+AUDIENCE = "https://chat.adverserial.ai"
 
 
 def test_hardware_verifier(*_args):

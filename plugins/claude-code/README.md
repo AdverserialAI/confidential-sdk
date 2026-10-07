@@ -119,10 +119,10 @@ every plugin update, and `settings.json` does not expand
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ADVERSERIAL_API_URL` | `https://cc-api.adverserial.ai/v1` | Endpoint base URL |
+| `ADVERSERIAL_API_URL` | `https://api.adverserial.ai/v1` | Endpoint base URL |
 | `ADVERSERIAL_MODEL` | `lordx64/cyberglm` | Expected receipt `model_id` |
 | `ADVERSERIAL_ISSUER` | `https://verify.adverserial.ai` | Expected receipt `iss` |
-| `ADVERSERIAL_AUDIENCE` | `https://cc-chat.adverserial.ai` | Expected receipt `aud` |
+| `ADVERSERIAL_AUDIENCE` | `https://chat.adverserial.ai` | Expected receipt `aud` |
 | `ADVERSERIAL_EXPECTED_ENDPOINT` | unset | Also pin the receipt `endpoint` claim |
 | `ADVERSERIAL_RECEIPT_KEYS_JSON` | unset | Pinned keys: JSON map kid → public JWK |
 | `ADVERSERIAL_RECEIPT_KEYS_FILE` | unset | Path to a JSON file with that map |

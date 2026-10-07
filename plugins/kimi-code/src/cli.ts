@@ -44,10 +44,10 @@ usage: adverserial-verify [--trust-evidence-key] [--status] [--json] [--help]
 exit codes: 0 = endpoint verified, 1 = failed / unpinned / stale cache / error
 
 environment:
-  ADVERSERIAL_API_URL             endpoint base URL (default https://cc-api.adverserial.ai/v1)
+  ADVERSERIAL_API_URL             endpoint base URL (default https://api.adverserial.ai/v1)
   ADVERSERIAL_MODEL               expected model id (default lordx64/cyberglm)
   ADVERSERIAL_ISSUER              receipt issuer (default https://verify.adverserial.ai)
-  ADVERSERIAL_AUDIENCE            receipt audience (default https://cc-chat.adverserial.ai)
+  ADVERSERIAL_AUDIENCE            receipt audience (default https://chat.adverserial.ai)
   ADVERSERIAL_EXPECTED_ENDPOINT   also pin the receipt's endpoint claim
   ADVERSERIAL_RECEIPT_KEYS_JSON   pinned receipt keys: JSON map kid -> public JWK
   ADVERSERIAL_RECEIPT_KEYS_FILE   path to a JSON file with that same map

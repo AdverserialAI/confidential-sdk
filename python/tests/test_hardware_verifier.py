@@ -26,7 +26,7 @@ def evidence_request():
     receipt = generate_private_key(SECP256R1()).public_key().public_numbers()
     receipt_jwk = {"kty": "EC", "crv": "P-256", "x": b64url_encode(receipt.x.to_bytes(32, "big")), "y": b64url_encode(receipt.y.to_bytes(32, "big"))}
     nonce = b64url_encode(b"n" * 32)
-    return {"nonce": nonce, "model": "lordx64/cyberglm", "endpoint": "https://cc-api.adverserial.ai", "evidence": {
+    return {"nonce": nonce, "model": "lordx64/cyberglm", "endpoint": "https://api.adverserial.ai", "evidence": {
         "nonce": nonce, "tdx_quote": "abcd", "tdx_event_log": {"rtmr": ["aa"]}, "gpu_evidence": {"eats": ["bb"]},
         "tls_spki_der": b64url_encode(tls), "tls_spki_sha256": fingerprint(tls), "receipt_pubkey_jwk": receipt_jwk,
         "workload": {"model_id": "lordx64/cyberglm"},

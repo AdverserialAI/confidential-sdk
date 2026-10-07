@@ -12,7 +12,7 @@ const result = await verifyEndpoint('https://host/v1', {
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys: { [kid]: jwk },
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'https://cc-chat.adverserial.ai',
+	audience: 'https://chat.adverserial.ai',
 	verifyHardwareEvidence: createPhalaNVIDIAVerifier({ minimumGPUCount: 8 })
 });
 if (result.status === 'verified' && !result.proof.devMode) { /* … */ }

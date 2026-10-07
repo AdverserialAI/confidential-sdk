@@ -12,7 +12,7 @@ const now = 1_800_000_000;
 const requestBody = '{"model":"lordx64/cyberglm","messages":[]}';
 const responseBody = '{"id":"c1","usage":{"prompt_tokens":3,"completion_tokens":2}}';
 const claims = {
-  iss: 'https://verify.adverserial.ai', aud: 'https://cc-chat.adverserial.ai', iat: now - 1, exp: now + 60,
+  iss: 'https://verify.adverserial.ai', aud: 'https://chat.adverserial.ai', iat: now - 1, exp: now + 60,
   model_id: 'lordx64/cyberglm', request_nonce: 'nonce', request_body_hash: digest(requestBody), response_hash: digest(responseBody),
   attestation_binding: { tls_spki_sha256: 'sha256:spki', evidence_digest: 'sha256:state' },
   usage: { input_tokens: 3, cached_tokens: 1, output_tokens: 2 }

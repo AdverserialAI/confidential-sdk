@@ -294,7 +294,7 @@ class FakeAttestProxy:
         dev: bool = True,
         model_id: str = "lordx64/cyberglm",
         issuer: str = "https://verify.adverserial.ai",
-        audience: str = "https://cc-chat.adverserial.ai",
+        audience: str = "https://chat.adverserial.ai",
         endpoint: Optional[str] = None,
         verdict: str = "verified",
         nonce_override: Optional[str] = None,
