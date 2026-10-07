@@ -23,7 +23,7 @@ from adverserial import (  # noqa: E402
 
 MODEL = "lordx64/cyberglm"
 ISSUER = "https://verify.adverserial.ai"
-AUDIENCE = "cc-chat.adverserial.ai"
+AUDIENCE = "https://cc-chat.adverserial.ai"
 MESSAGES = [{"role": "user", "content": "hi"}]
 
 

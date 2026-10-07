@@ -19,7 +19,7 @@ from .verify import (
 )
 
 _DEFAULT_ISSUER = "https://verify.adverserial.ai"
-_DEFAULT_AUDIENCE = "cc-chat.adverserial.ai"
+_DEFAULT_AUDIENCE = "https://cc-chat.adverserial.ai"
 _DEFAULT_MODEL = "lordx64/cyberglm"
 
 _DEV_WARNING = (

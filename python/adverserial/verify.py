@@ -181,7 +181,7 @@ def verify_endpoint(
     expected_model_id: str,
     trusted_receipt_keys: Mapping[str, Mapping[str, Any]],
     issuer: str = "https://verify.adverserial.ai",
-    audience: str = "cc-chat.adverserial.ai",
+    audience: str = "https://cc-chat.adverserial.ai",
     expected_endpoint: Optional[str] = None,
     expected_model_digest: Optional[str] = None,
     expected_runtime_digest: Optional[str] = None,

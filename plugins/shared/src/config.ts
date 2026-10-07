@@ -17,7 +17,7 @@ import type { TrustedReceiptKeys } from '../../../typescript/src/index.js';
 export const DEFAULT_BASE_URL = 'https://cc-api.adverserial.ai/v1';
 export const DEFAULT_MODEL_ID = 'lordx64/cyberglm';
 export const DEFAULT_ISSUER = 'https://verify.adverserial.ai';
-export const DEFAULT_AUDIENCE = 'cc-chat.adverserial.ai';
+export const DEFAULT_AUDIENCE = 'https://cc-chat.adverserial.ai';
 export const KEYS_URL = 'https://verify.adverserial.ai';
 
 export type CoreEnv = Record<string, string | undefined>;

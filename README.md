@@ -75,7 +75,7 @@ proof = verify_endpoint(
     expected_model_id="lordx64/cyberglm",
     trusted_receipt_keys={kid: jwk},            # pinned out-of-band
     issuer="https://verify.adverserial.ai",
-    audience="cc-chat.adverserial.ai",
+    audience="https://cc-chat.adverserial.ai",
 )
 proof.dev_mode          # True => synthetic plumbing proof, NOT hardware
 proof.tls_spki_sha256   # "sha256:<base64url>" — the channel pin
@@ -123,7 +123,7 @@ const result = await verifyEndpoint('https://host/v1', {
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys: { [kid]: jwk },   // pinned out-of-band
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'cc-chat.adverserial.ai'
+	audience: 'https://cc-chat.adverserial.ai'
 });
 // result: { status: 'verified', proof } | { status: 'failed', reason }
 // proof.devMode — synthetic plumbing proof warning, as above
@@ -134,7 +134,7 @@ const client = await createVerifiedOpenAI({
 	expectedModelId: 'lordx64/cyberglm',
 	trustedReceiptKeys,
 	issuer: 'https://verify.adverserial.ai',
-	audience: 'cc-chat.adverserial.ai'
+	audience: 'https://cc-chat.adverserial.ai'
 });
 // client.fetchImpl is fetch-compatible, injects Authorization, and REFUSES
 // to send (throws VerificationRequiredError) when verification failed:
