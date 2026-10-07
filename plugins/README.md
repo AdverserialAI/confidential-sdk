@@ -18,7 +18,8 @@ response.
 
 | Directory | Client | Integration |
 | --- | --- | --- |
-| [`adverserial-verify/`](adverserial-verify/) | Codex | Codex plugin skill that requires local verification before confidential use |
+| [`adverserial-verify/`](adverserial-verify/) | Codex | Codex plugin skill that requires local verification before confidential use, plus a `/prompts:attestation` custom prompt |
+| [`claude-code/`](claude-code/) | Claude Code | `/adverserial-verify-claude:attestation` command, skill, SessionStart hook, and status-line badge (shares the kimi-code CLI build) |
 | [`opencode/`](opencode/) | OpenCode | Plugin tools: `adverserial_verify` and `adverserial_status` |
 | [`kimi-code/`](kimi-code/) | Kimi Code | CLI, skill, and SessionStart hook |
 | [`../gateway/`](../gateway/) | OpenAI-compatible local clients | Loopback-only gateway; API key → billing entitlement → direct attested endpoint |

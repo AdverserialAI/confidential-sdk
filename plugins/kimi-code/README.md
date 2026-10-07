@@ -71,7 +71,11 @@ timeout = 10
 node bin/adverserial-verify
 
 # against a local DEV_MODE attest-proxy (synthetic evidence, self-signed TLS):
+# the hardware verifier command is mandatory; for synthetic dev evidence use a
+# dev double like ../opencode/test/dev-hardware-verifier.mjs (the shipped
+# verifier only accepts genuine hardware evidence)
 ADVERSERIAL_API_URL=https://127.0.0.1:8443/v1 \
+ADVERSERIAL_HARDWARE_VERIFIER_COMMAND=/absolute/path/to/plugins/opencode/test/dev-hardware-verifier.mjs \
   node bin/adverserial-verify --trust-evidence-key
 
 # network-free status of the last result (used by hooks)

@@ -78,6 +78,29 @@ ADVERSERIAL ATTESTATION: VERIFIED — UNPINNED (TOFU dev mode)
 (fresh attestation check)
 ```
 
+## No plugin slash commands in opencode
+
+opencode plugins can contribute tools and event hooks, but they **cannot
+register custom slash commands** — commands come from config, not plugins
+([opencode plugin docs](https://opencode.ai/docs/plugins/)). The equivalent
+of the other harnesses' `attestation` command is a user-level custom command
+file; drop this into `~/.config/opencode/commands/attestation.md` (global)
+or `.opencode/commands/attestation.md` (per-project) to get `/attestation`:
+
+```md
+---
+description: Verify the Adverserial confidential endpoint attestation and show the verdict
+---
+
+Use the adverserial_verify tool to run a fresh Adverserial attestation check
+(or adverserial_status for the cached state) and report the result:
+
+1. Show the user the tool's verdict output verbatim, then one sentence of
+   interpretation.
+2. Never paraphrase a failed, stale, or UNPINNED (TOFU) verdict as verified.
+   If it fails, show the reason line and stop.
+```
+
 ## Environment
 
 | Variable | Default | Purpose |
@@ -111,13 +134,22 @@ Notes:
 ## Smoke test
 
 With a DEV_MODE attest-proxy running on loopback
-(`cd ../../../attest-proxy && DEV_MODE=1 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy`):
+(`cd ../../../attest-proxy && DEV_MODE=1 AUTH_REQUIRED=0 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy`):
 
 ```sh
 cd adverserial-sdk/plugins/opencode
-ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 ADVERSERIAL_TRUST_EVIDENCE_KEY=1 npm test
-ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 npm test -- --expect-unpinned
+export ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1
+ADVERSERIAL_TRUST_EVIDENCE_KEY=1 \
+  ADVERSERIAL_HARDWARE_VERIFIER_COMMAND="$PWD/test/dev-hardware-verifier.mjs" \
+  npm test
+npm test -- --expect-unpinned
 ```
+
+The hardware verifier command is mandatory (verification fails closed
+without it); `test/dev-hardware-verifier.mjs` is a fixture that accepts only
+synthetic DEV_MODE evidence, mirroring the SDK's own dev test double. Real
+evidence must go through the shipped
+`typescript/bin/adverserial-hardware-verify.mjs`.
 
 This drives the exact tool code path (plugin module + tools + TTL cache)
 under plain Node, without the opencode runtime.

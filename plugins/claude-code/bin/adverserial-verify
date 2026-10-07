@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+/**
+ * adverserial-verify — Claude Code plugin entry point.
+ *
+ * Shim into the self-contained CLI the plugins workspace builds from the
+ * shared core (npm run build in plugins/), emitted at
+ * plugins/kimi-code/dist/plugins/kimi-code/src/cli.js. No source is
+ * duplicated in this package. The shim only resolves when the plugin sits
+ * next to a built kimi-code package, i.e. in a checkout of
+ * github.com/AdverserialAI/confidential-sdk after `npm run build` — which is
+ * why the README installs the plugin from a local marketplace path (Claude
+ * Code then loads the plugin in place) instead of from the GitHub
+ * marketplace (whose cache copy excludes sibling directories).
+ */
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const cli = fileURLToPath(
+	new URL('../../kimi-code/dist/plugins/kimi-code/src/cli.js', import.meta.url)
+);
+
+if (!existsSync(cli)) {
+	console.error(
+		'adverserial-verify: build output not found:\n' +
+			`  ${cli}\n` +
+			'Clone https://github.com/AdverserialAI/confidential-sdk and run\n' +
+			'`npm install && npm run build` in its plugins/ directory, then load the plugin\n' +
+			'from that checkout (see plugins/claude-code/README.md).'
+	);
+	process.exit(1);
+}
+
+await import(cli);
