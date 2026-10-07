@@ -40,8 +40,8 @@ try {
 	const result = await verifier({
 		evidence: input.evidence,
 		nonce: input.nonce,
-		expectedModelId: input.expectedModelId,
-		expectedEndpoint: input.expectedEndpoint
+		expectedModelId: input.expectedModelId ?? input.model,
+		expectedEndpoint: input.expectedEndpoint ?? input.endpoint
 	});
 	if (!result || result.verified !== true) fail('hardware evidence rejected');
 	process.stdout.write(JSON.stringify({

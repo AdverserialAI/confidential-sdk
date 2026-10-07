@@ -36,7 +36,7 @@ from urllib.parse import urlsplit
 from cryptography.exceptions import InvalidSignature
 
 from ._canonjson import evidence_digest as canonical_evidence_digest
-from ._jws import b64url_encode, jwk_thumbprint, parse_compact_jws, verify_es256
+from ._jws import b64url_decode, b64url_encode, jwk_thumbprint, parse_compact_jws, verify_es256
 from ._tls import TLSPinMismatchError, attestation_ssl_context, spki_sha256_from_cert_der
 
 __all__ = [

@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from adverserial import VerificationError, VerifiedProof, VerifiedSession, verify_endpoint
 
@@ -50,13 +51,18 @@ class Dispatcher:
         if cached.fresh_for(model):
             return cached.proof  # type: ignore[return-value]
         try:
+            # The proxy signs the receipt's endpoint claim with the bare origin
+            # (e.g. https://cc-api.adverserial.ai), while cc_api_url carries the
+            # /v1 suffix for the OpenAI API; compare against the origin.
+            parts = urlsplit(self.config.cc_api_url)
+            expected_endpoint = f"{parts.scheme}://{parts.netloc}"
             proof = verify_endpoint(
                 self.config.cc_api_url,
                 expected_model_id=model,
                 trusted_receipt_keys=self.config.receipt_keys,
                 issuer=self.config.issuer,
                 audience=self.config.audience,
-                expected_endpoint=self.config.cc_api_url,
+                expected_endpoint=expected_endpoint,
                 hardware_verifier=verifier_from_command(self.config.hardware_verifier_command),
             )
         except VerificationError as exc:
@@ -108,8 +114,11 @@ class Dispatcher:
             raise AuthorizationError("A normal Adverserial API key is required.")
         # The JSON wire body is a safe upper bound on token count for text JSON:
         # a byte-level tokenizer cannot produce more than one token per UTF-8 byte.
+        # The SDK re-serializes the payload before sending (adding "stream" and
+        # its own separators), so reserve with headroom; the proxy bounds the
+        # actual received body and settlement charges actual usage only.
         serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        max_input = len(serialized)
+        max_input = 2 * len(serialized) + 4096
         if not 1 <= max_input <= self.config.max_input_tokens:
             raise ClientRequestError("Request exceeds the confidential input policy.")
         requested_output = payload.get("max_tokens", 4096)
