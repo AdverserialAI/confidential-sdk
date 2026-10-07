@@ -17,8 +17,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-	"build:browser": "npm run build && node scripts/build-browser.mjs",
-	"test": "node test/node-dev-test.mjs && node test/inference-receipt-test.mjs && node test/nvidia-evidence-test.mjs"
+    "build:browser": "npm run build && node scripts/build-browser.mjs",
+    "test": "node test/node-dev-test.mjs && node test/inference-receipt-test.mjs && node test/nvidia-evidence-test.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -30,5 +30,8 @@
   "dependencies": {
     "@phala/dcap-qvl": "0.6.5",
     "ehbp": "0.3.3"
+  },
+  "bin": {
+    "adverserial-hardware-verify": "bin/adverserial-hardware-verify.mjs"
   }
 }
