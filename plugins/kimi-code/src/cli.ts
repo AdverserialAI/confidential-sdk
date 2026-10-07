@@ -72,10 +72,23 @@ const saveCache = (verdict: CoreVerdict): void => {
 	}
 };
 
+const isValidCachedVerdict = (verdict: CoreVerdict): boolean => {
+	if (!verdict.config || typeof verdict.config !== 'object') return false;
+	switch (verdict.status) {
+		case 'verified':
+			return typeof verdict.proof === 'object' && verdict.proof !== null;
+		case 'failed':
+		case 'unpinned':
+			return typeof verdict.reason === 'string';
+		default:
+			return false;
+	}
+};
+
 const loadCache = (): CacheEntry | null => {
 	try {
 		const verdict = JSON.parse(readFileSync(cacheFilePath(), 'utf8')) as CoreVerdict;
-		if (!verdict || typeof verdict.verifiedAt !== 'number') return null;
+		if (!verdict || typeof verdict.verifiedAt !== 'number' || !isValidCachedVerdict(verdict)) return null;
 		return { verdict, ageMs: Date.now() - verdict.verifiedAt, fromCache: true };
 	} catch {
 		return null;

@@ -3,12 +3,16 @@
  * opencode runtime) against a DEV_MODE attest-proxy.
  *
  * Start a dev proxy first, e.g.:
- *   (cd ../../../attest-proxy && DEV_MODE=1 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy)
+ *   (cd ../../../attest-proxy && DEV_MODE=1 AUTH_REQUIRED=0 LISTEN_ADDR=127.0.0.1:0 go run ./cmd/attest-proxy)
  * then:
  *   ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 ADVERSERIAL_TRUST_EVIDENCE_KEY=1 \
+ *     ADVERSERIAL_HARDWARE_VERIFIER_COMMAND=<abs path>/test/dev-hardware-verifier.mjs \
  *     node test/smoke.mjs            # TOFU run: expect VERIFIED + dev_mode warnings
  *   ADVERSERIAL_API_URL=https://127.0.0.1:<port>/v1 \
  *     node test/smoke.mjs --expect-unpinned
+ *
+ * The hardware verifier command is mandatory (fail closed); the fixture
+ * accepts only synthetic dev evidence, like the SDK's own dev test double.
  *
  * Exercises the exact code path the opencode tools use (same module, same
  * cache), minus opencode's tool dispatch.

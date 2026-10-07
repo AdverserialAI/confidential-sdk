@@ -137,6 +137,9 @@ export const runVerification = async (config: CoreConfig, deps?: VerifyDeps): Pr
 		issuer: config.issuer,
 		audience: config.audience,
 		...(config.expectedEndpoint ? { expectedEndpoint: config.expectedEndpoint } : {}),
+		// The SDK rejects synthetic DEV_MODE evidence unless the caller opts in;
+		// the only legitimate opt-in here is the dev-only TOFU escape hatch.
+		allowDevMode: config.trustEvidenceKey,
 		verifyHardwareEvidence: hardwareVerifier(config.hardwareVerifierCommand),
 		fetchImpl
 	});
