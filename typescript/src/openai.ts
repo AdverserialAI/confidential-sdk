@@ -50,6 +50,9 @@ export type VerifiedOpenAI = {
 	 * failed.
 	 */
 	fetchImpl: typeof fetch;
+	/** Bind a fresh, one-use billing entitlement to this already verified proof.
+	 * This never re-fetches evidence or weakens the verified endpoint binding. */
+	fetchWithEntitlement: (entitlement: string) => typeof fetch;
 };
 
 export class VerificationRequiredError extends Error {
@@ -79,6 +82,28 @@ const encryptedFetch = async (
 	return new Transport(identity, new URL(request.url).host).request(request);
 };
 
+const fetchForProof = (
+	proof: VerifiedProof | null,
+	reason: string | null,
+	innerFetch: typeof fetch,
+	entitlement?: string
+): typeof fetch => {
+	return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+		if (!proof) throw new VerificationRequiredError(reason ?? 'verification failed');
+		if (proof.expiresEpoch <= Date.now() / 1000) throw new VerificationRequiredError('the verified confidential proof has expired');
+		const headers = new Headers(init?.headers);
+		// Do not allow an OpenAI client's long-lived API key to cross this
+		// boundary. The CVM receives only a short-lived model-bound entitlement.
+		headers.delete('Authorization');
+		if (!entitlement) throw new VerificationRequiredError('a short-lived confidential entitlement is required');
+		headers.set('Authorization', `Bearer ${entitlement}`);
+		const requestInit = { ...init, headers };
+		return proof.ehbpKeyConfig
+			? encryptedFetch(proof, innerFetch, input, requestInit)
+			: innerFetch(input, requestInit);
+	}) as typeof fetch;
+};
+
 export const createVerifiedOpenAI = async (
 	options: VerifiedOpenAIOptions
 ): Promise<VerifiedOpenAI> => {
@@ -86,26 +111,15 @@ export const createVerifiedOpenAI = async (
 	const proof = result.status === 'verified' ? result.proof : null;
 	const reason = result.status === 'failed' ? result.reason : null;
 	const innerFetch = options.fetchImpl ?? fetch;
-
-	const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-		if (!proof) throw new VerificationRequiredError(reason ?? 'verification failed');
-		const headers = new Headers(init?.headers);
-		// Do not allow an OpenAI client's long-lived API key to cross this
-		// boundary. The CVM receives only a short-lived model-bound entitlement.
-		headers.delete('Authorization');
-		if (!options.entitlement) throw new VerificationRequiredError('a short-lived confidential entitlement is required');
-		headers.set('Authorization', `Bearer ${options.entitlement}`);
-		const requestInit = { ...init, headers };
-		return proof.ehbpKeyConfig
-			? encryptedFetch(proof, innerFetch, input, requestInit)
-			: innerFetch(input, requestInit);
-	}) as typeof fetch;
+	const fetchWithEntitlement = (entitlement: string): typeof fetch =>
+		fetchForProof(proof, reason, innerFetch, entitlement);
 
 	return {
 		verified: proof !== null,
 		proof,
 		reason,
 		baseURL: options.baseURL,
-		fetchImpl
+		fetchImpl: fetchForProof(proof, reason, innerFetch, options.entitlement),
+		fetchWithEntitlement
 	};
 };

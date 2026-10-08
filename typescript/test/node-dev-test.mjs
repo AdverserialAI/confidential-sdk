@@ -194,7 +194,18 @@ try {
 	assert.equal(await health.text(), 'ok\n');
 	console.log('✓ createVerifiedOpenAI: verified fetchImpl works');
 
-	// 8. createVerifiedOpenAI: failed verification => fetchImpl refuses.
+	// 8. A one-use entitlement binds to the already-verified proof; it does not
+	// trigger a second evidence fetch after billing has issued the entitlement.
+	const proofClient = await createVerifiedOpenAI({
+		baseURL: `${base}/v1`,
+		...verifyOptions
+	});
+	assert.equal(proofClient.verified, true);
+	const entitledHealth = await proofClient.fetchWithEntitlement('test-entitlement')(`${base}/healthz`);
+	assert.equal(entitledHealth.status, 200);
+	console.log('✓ entitlement binds to existing verified proof');
+
+	// 9. createVerifiedOpenAI: failed verification => fetchImpl refuses.
 	const brokenClient = await createVerifiedOpenAI({
 		baseURL: `${base}/v1`,
 		entitlement: 'test-entitlement',
