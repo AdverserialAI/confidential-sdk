@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-import '../dist/plugins/kimi-code/src/cli.js';
+import "../dist/adverserial-verify.bundle.mjs";
