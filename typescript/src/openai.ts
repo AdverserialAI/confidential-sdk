@@ -79,7 +79,25 @@ const encryptedFetch = async (
 	// streaming frame format and downgrade handling are interoperable with the
 	// proxy; the key config is quote-bound above, so discovery is forbidden.
 	const identity = await Identity.unmarshalPublicConfig(proof.ehbpKeyConfig);
-	return new Transport(identity, new URL(request.url).host).request(request);
+	const transport = new Transport(identity, new URL(request.url).host);
+	// The EHBP transport always calls the global fetch. When the caller supplied
+	// a custom fetch (e.g. the confidential chat's same-origin relay), route the
+	// encrypted request through it — but only for requests still aimed at the
+	// endpoint's own host, so the relay's own outbound call reaches the original
+	// global fetch instead of recursing. Restore the global afterwards.
+	if (innerFetch === fetch) return transport.request(request);
+	const original = globalThis.fetch;
+	const host = new URL(request.url).host;
+	globalThis.fetch = ((inner: RequestInfo | URL, innerInit?: RequestInit) => {
+		const innerURL = typeof inner === 'string' ? inner : inner instanceof URL ? inner.href : inner.url;
+		if (new URL(innerURL).host === host) return innerFetch(inner, innerInit);
+		return original(inner as any, innerInit);
+	}) as typeof fetch;
+	try {
+		return await transport.request(request);
+	} finally {
+		globalThis.fetch = original;
+	}
 };
 
 const fetchForProof = (
