@@ -37,6 +37,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
+        # No Content-Length and no chunked framing: the only end-of-response
+        # signal is closing the connection. Without this, HTTP/1.1 keep-alive
+        # leaves clients waiting forever after [DONE].
+        self.close_connection = True
+        self.send_header("Connection", "close")
         self.end_headers()
 
     def _sse(self, payload: dict, event: str | None = None):
