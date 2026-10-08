@@ -128,6 +128,15 @@ const main = async (): Promise<number> => {
 	try {
 		config = resolveConfig(process.env, { trustEvidenceKey: flags.has('--trust-evidence-key') });
 	} catch (error) {
+		// A missing/invalid configuration must never leave a stale "verified"
+		// badge behind: record the failure so --status and the statusline flip.
+		saveCache({
+			status: 'failed',
+			trust: 'pinned',
+			reason: error instanceof ConfigError ? `config error: ${error.message}` : String(error),
+			verifiedAt: Date.now(),
+			config: { baseURL: '', modelId: '', issuer: '', audience: '', keysSource: null, trustEvidenceKey: false, hardwareVerifierConfigured: false }
+		});
 		console.error(error instanceof ConfigError ? `config error: ${error.message}` : String(error));
 		return 1;
 	}
