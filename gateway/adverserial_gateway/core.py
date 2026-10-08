@@ -132,7 +132,44 @@ class Dispatcher:
         stream = bool(outbound.pop("stream", False))
         outbound["max_tokens"] = max_output
         session = VerifiedSession(self.config.cc_api_url, proof=proof, entitlement=entitlement, timeout=600)
-        return session.chat_completions(outbound.pop("messages", []), model=model, stream=stream, **outbound)
+        try:
+            return session.chat_completions(outbound.pop("messages", []), model=model, stream=stream, **outbound)
+        except Exception as exc:
+            # Release the billing reservation only when the request provably
+            # never ran at the enclave: local setup failures, or a 4xx from
+            # the gate (the request was rejected before any generation, so no
+            # meter event will arrive to settle it). Never release after a
+            # 5xx/timeout/stream break — the meter may still settle, and a
+            # released-then-settled reservation poisons the proxy outbox.
+            message = str(exc)
+            pre_send = isinstance(exc, (TypeError, ValueError)) or "EHBP" in message or "entitlement" in message
+            rejected = "failed with HTTP 4" in message
+            if pre_send or rejected:
+                self.release_reservation(api_key, entitlement)
+            raise
+
+    def release_reservation(self, api_key: str, entitlement: str) -> None:
+        """Best-effort release of the billing reservation behind a minted
+        entitlement (its jti is the reservation id). Never raises."""
+        try:
+            parts = entitlement.split(".")
+            if len(parts) != 3:
+                return
+            import base64 as _b64
+            claims = json.loads(_b64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+            reservation_id = claims.get("jti")
+            if not isinstance(reservation_id, str) or not reservation_id:
+                return
+            request = urllib.request.Request(
+                self.config.billing_url + "/cc/release",
+                data=json.dumps({"reservation_id": reservation_id}).encode(),
+                method="POST",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(request, timeout=10):
+                pass
+        except Exception:
+            pass
 
     def adapted_completion(self, api_key: str, model: str, payload: Mapping[str, Any]):
         """Dispatch a locally translated request after binding it to a canonical model."""
