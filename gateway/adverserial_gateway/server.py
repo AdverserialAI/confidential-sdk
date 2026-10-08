@@ -64,18 +64,66 @@ class Handler(BaseHTTPRequestHandler):
     def _stream_anthropic(self, stream, model: str):
         self._sse_start(); message_id = "msg_" + uuid.uuid4().hex
         self._sse({"type":"message_start","message":{"id":message_id,"type":"message","role":"assistant","model":model,"content":[],"stop_reason":None,"stop_sequence":None,"usage":{"input_tokens":0,"output_tokens":0}}}, "message_start")
-        # GLM reasoning streams in delta.reasoning_content; map it to an
-        # Anthropic thinking block at index 0, with text following at index 1.
-        index = 0; open_block = None; saw_tool = False
-        def close_block():
-            nonlocal index, open_block
+        # Preserve each OpenAI stream tool-call index. Anthropic requires
+        # content blocks to close in order, so each upstream tool-call block
+        # is closed before the next begins while its argument fragments remain
+        # associated with its original OpenAI index.
+        next_index = 0; open_block = None; blocks = {}; saw_tool = False
+        def close_block(block):
+            nonlocal open_block
+            if block is None or block.get("closed"):
+                return
+            if block["kind"] == "thinking":
+                # Anthropic clients require a terminal signature marker for a
+                # thinking block. It is a transport marker only here; the
+                # attested receipt remains the cryptographic proof.
+                self._sse({"type":"content_block_delta","index":block["index"],"delta":{"type":"signature_delta","signature":""}}, "content_block_delta")
+            self._sse({"type":"content_block_stop","index":block["index"]}, "content_block_stop")
+            block["closed"] = True
+            if open_block is block:
+                open_block = None
+
+        def start_plain(kind):
+            nonlocal next_index, open_block
+            if open_block is not None and open_block["kind"] != kind:
+                close_block(open_block)
             if open_block is not None:
-                if open_block == "thinking":
-                    # Anthropic clients expect a signature before the thinking
-                    # block closes; nothing verifies it on this path.
-                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"signature_delta","signature":""}}, "content_block_delta")
-                self._sse({"type":"content_block_stop","index":index}, "content_block_stop")
-                index += 1; open_block = None
+                return open_block
+            block = {"kind": kind, "index": next_index, "closed": False}
+            next_index += 1
+            payload = {"type": kind, kind: ""}
+            self._sse({"type":"content_block_start","index":block["index"],"content_block":payload}, "content_block_start")
+            open_block = block
+            return block
+
+        def tool_block(call):
+            nonlocal next_index, open_block, saw_tool
+            raw_index = call.get("index")
+            key = raw_index if isinstance(raw_index, int) else call.get("id")
+            if key is None:
+                raise ClientRequestError("upstream streamed a tool call without an index or id")
+            block = blocks.get(key)
+            fn = call.get("function") or {}
+            name = fn.get("name") if isinstance(fn, dict) and isinstance(fn.get("name"), str) else ""
+            call_id = call.get("id") if isinstance(call.get("id"), str) else ""
+            if block is None:
+                if not name:
+                    raise ClientRequestError("upstream streamed a tool argument before its function name")
+                if open_block is not None:
+                    close_block(open_block)
+                block = {"kind": "tool_use", "index": next_index, "closed": False, "id": call_id or "toolu_" + uuid.uuid4().hex, "name": name}
+                next_index += 1
+                blocks[key] = block
+                self._sse({"type":"content_block_start","index":block["index"],"content_block":{"type":"tool_use","id": "toolu_" + block["id"].removeprefix("toolu_"), "name":name,"input":{}}}, "content_block_start")
+                open_block = block
+                saw_tool = True
+            elif block is not open_block:
+                if block.get("closed"):
+                    raise ClientRequestError("upstream interleaved tool arguments after an earlier tool block closed")
+                if open_block is not None:
+                    close_block(open_block)
+                open_block = block
+            return block
         try:
             usage = {}
             for chunk in stream:
@@ -84,47 +132,64 @@ class Handler(BaseHTTPRequestHandler):
                 thinking = delta.get("reasoning_content")
                 text = delta.get("content")
                 if thinking:
-                    if open_block != "thinking":
-                        close_block()
-                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"thinking","thinking":""}}, "content_block_start")
-                        open_block = "thinking"
-                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"thinking_delta","thinking":thinking}}, "content_block_delta")
+                    block = start_plain("thinking")
+                    self._sse({"type":"content_block_delta","index":block["index"],"delta":{"type":"thinking_delta","thinking":thinking}}, "content_block_delta")
                 for call in (delta.get("tool_calls") or []):
-                    # OpenAI tool_calls stream as name first, then argument
-                    # fragments. Map to Anthropic tool_use blocks: open on the
-                    # name-bearing delta, stream arguments as input_json_delta.
-                    cid = call.get("id") if isinstance(call.get("id"), str) else ""
+                    if not isinstance(call, dict):
+                        raise ClientRequestError("upstream streamed an invalid tool call")
+                    block = tool_block(call)
                     fn = call.get("function") or {}
-                    name = fn.get("name") if isinstance(fn.get("name"), str) else ""
-                    args = fn.get("arguments") if isinstance(fn.get("arguments"), str) else ""
-                    if name:
-                        close_block()
-                        tool_id = "toolu_" + (cid or uuid.uuid4().hex)
-                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"tool_use","id":tool_id,"name":name,"input":{}}}, "content_block_start")
-                        open_block = "tool_use"
-                        saw_tool = True
-                    if args and open_block == "tool_use":
-                        self._sse({"type":"content_block_delta","index":index,"delta":{"type":"input_json_delta","partial_json":args}}, "content_block_delta")
+                    args = fn.get("arguments") if isinstance(fn, dict) and isinstance(fn.get("arguments"), str) else ""
+                    if args:
+                        self._sse({"type":"content_block_delta","index":block["index"],"delta":{"type":"input_json_delta","partial_json":args}}, "content_block_delta")
                 if text:
-                    if open_block != "text":
-                        close_block()
-                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"text","text":""}}, "content_block_start")
-                        open_block = "text"
-                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"text_delta","text":text}}, "content_block_delta")
+                    block = start_plain("text")
+                    self._sse({"type":"content_block_delta","index":block["index"],"delta":{"type":"text_delta","text":text}}, "content_block_delta")
                 usage = chunk.get("usage") or usage
             if not stream.receipt_verified:
                 raise ClientRequestError("confidential stream ended without a verified receipt")
-            close_block()
+            close_block(open_block)
+            for block in blocks.values():
+                close_block(block)
             self._sse({"type":"message_delta","delta":{"stop_reason":"tool_use" if saw_tool else "end_turn","stop_sequence":None},"usage":{"output_tokens":usage.get("completion_tokens",0)}}, "message_delta")
             self._sse({"type":"message_stop"}, "message_stop")
         except (GatewayError, VerificationError, ValueError, OSError) as exc:
             self._sse({"type":"error","error":{"type":"api_error","message":str(exc)}}, "error")
 
     def _stream_responses(self, stream, model: str):
-        self._sse_start(); rid = "resp_" + uuid.uuid4().hex; mid = "msg_" + uuid.uuid4().hex
+        self._sse_start(); rid = "resp_" + uuid.uuid4().hex
         self._sse({"type":"response.created","response":{"id":rid,"object":"response","status":"in_progress","model":model,"output":[]}}, "response.created")
-        self._sse({"type":"response.output_item.added","output_index":0,"item":{"id":mid,"type":"message","status":"in_progress","role":"assistant","content":[]}}, "response.output_item.added")
-        self._sse({"type":"response.content_part.added","item_id":mid,"output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}, "response.content_part.added")
+        next_index = 0; text_state = None; tools = {}; completed = []
+
+        def start_text():
+            nonlocal next_index, text_state
+            if text_state is not None:
+                return text_state
+            text_state = {"id":"msg_" + uuid.uuid4().hex, "index":next_index, "text":""}
+            next_index += 1
+            self._sse({"type":"response.output_item.added","output_index":text_state["index"],"item":{"id":text_state["id"],"type":"message","status":"in_progress","role":"assistant","content":[]}}, "response.output_item.added")
+            self._sse({"type":"response.content_part.added","item_id":text_state["id"],"output_index":text_state["index"],"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}, "response.content_part.added")
+            return text_state
+
+        def start_tool(call):
+            nonlocal next_index
+            raw_index = call.get("index")
+            key = raw_index if isinstance(raw_index, int) else call.get("id")
+            if key is None:
+                raise ClientRequestError("upstream streamed a tool call without an index or id")
+            state = tools.get(key)
+            fn = call.get("function") or {}
+            name = fn.get("name") if isinstance(fn, dict) and isinstance(fn.get("name"), str) else ""
+            call_id = call.get("id") if isinstance(call.get("id"), str) else ""
+            if state is None:
+                if not name:
+                    raise ClientRequestError("upstream streamed a tool argument before its function name")
+                call_id = call_id or "call_" + uuid.uuid4().hex
+                state = {"id":"fc_" + call_id, "call_id":call_id, "name":name, "index":next_index, "arguments":""}
+                next_index += 1
+                tools[key] = state
+                self._sse({"type":"response.output_item.added","output_index":state["index"],"item":{"id":state["id"],"type":"function_call","status":"in_progress","call_id":call_id,"name":name,"arguments":""}}, "response.output_item.added")
+            return state
         try:
             usage = {}
             for chunk in stream:
@@ -132,15 +197,33 @@ class Handler(BaseHTTPRequestHandler):
                 delta = choice.get("delta") or {}
                 text = delta.get("content")
                 if text:
-                    self._sse({"type":"response.output_text.delta","item_id":mid,"output_index":0,"content_index":0,"delta":text}, "response.output_text.delta")
+                    state = start_text(); state["text"] += text
+                    self._sse({"type":"response.output_text.delta","item_id":state["id"],"output_index":state["index"],"content_index":0,"delta":text}, "response.output_text.delta")
+                for call in (delta.get("tool_calls") or []):
+                    if not isinstance(call, dict):
+                        raise ClientRequestError("upstream streamed an invalid tool call")
+                    state = start_tool(call)
+                    fn = call.get("function") or {}
+                    args = fn.get("arguments") if isinstance(fn, dict) and isinstance(fn.get("arguments"), str) else ""
+                    if args:
+                        state["arguments"] += args
+                        self._sse({"type":"response.function_call_arguments.delta","item_id":state["id"],"output_index":state["index"],"delta":args}, "response.function_call_arguments.delta")
                 usage = chunk.get("usage") or usage
             if not stream.receipt_verified:
                 raise ClientRequestError("confidential stream ended without a verified receipt")
-            self._sse({"type":"response.output_text.done","item_id":mid,"output_index":0,"content_index":0,"text":""}, "response.output_text.done")
-            self._sse({"type":"response.content_part.done","item_id":mid,"output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}, "response.content_part.done")
-            item={"id":mid,"type":"message","status":"completed","role":"assistant","content":[]}
-            self._sse({"type":"response.output_item.done","output_index":0,"item":item}, "response.output_item.done")
-            self._sse({"type":"response.completed","response":{"id":rid,"object":"response","status":"completed","model":model,"output":[item],"usage":{"input_tokens":usage.get("prompt_tokens",0),"output_tokens":usage.get("completion_tokens",0),"total_tokens":usage.get("total_tokens",0)}}}, "response.completed")
+            if text_state is not None:
+                item={"id":text_state["id"],"type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":text_state["text"],"annotations":[]}]}
+                self._sse({"type":"response.output_text.done","item_id":text_state["id"],"output_index":text_state["index"],"content_index":0,"text":text_state["text"]}, "response.output_text.done")
+                self._sse({"type":"response.content_part.done","item_id":text_state["id"],"output_index":text_state["index"],"content_index":0,"part":item["content"][0]}, "response.content_part.done")
+                self._sse({"type":"response.output_item.done","output_index":text_state["index"],"item":item}, "response.output_item.done")
+                completed.append((text_state["index"], item))
+            for state in tools.values():
+                item={"id":state["id"],"type":"function_call","status":"completed","call_id":state["call_id"],"name":state["name"],"arguments":state["arguments"]}
+                self._sse({"type":"response.function_call_arguments.done","item_id":state["id"],"output_index":state["index"],"name":state["name"],"arguments":state["arguments"]}, "response.function_call_arguments.done")
+                self._sse({"type":"response.output_item.done","output_index":state["index"],"item":item}, "response.output_item.done")
+                completed.append((state["index"], item))
+            output=[item for _index, item in sorted(completed)]
+            self._sse({"type":"response.completed","response":{"id":rid,"object":"response","status":"completed","model":model,"output":output,"usage":{"input_tokens":usage.get("prompt_tokens",0),"output_tokens":usage.get("completion_tokens",0),"total_tokens":usage.get("total_tokens",0)}}}, "response.completed")
         except (GatewayError, VerificationError, ValueError, OSError) as exc:
             self._sse({"type":"response.failed","response":{"id":rid,"object":"response","status":"failed","error":{"code":"confidential_gateway_error","message":str(exc)}}}, "response.failed")
 

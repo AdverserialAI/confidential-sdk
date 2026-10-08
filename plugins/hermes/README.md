@@ -39,6 +39,12 @@ Use it in a session:
 or make it the default main model with `hermes model` (pick the custom
 provider entry) or via `hermes config set`.
 
+The same ready-to-merge configuration is available at
+[`../../profiles/hermes.confidential.yaml`](../../profiles/hermes.confidential.yaml).
+Hermes speaks OpenAI Chat Completions to the loopback gateway; tool turns are
+carried as standard `tool_calls` and `tool` messages, then each completed
+stream is accepted only after its runtime receipt verifies.
+
 ## 2. Optional: attestation skill
 
 Hermes auto-discovers skills from `~/.hermes/skills/`:

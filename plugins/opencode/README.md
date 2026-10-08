@@ -31,6 +31,14 @@ npm install
 npm run build            # tsc; output is self-contained (SDK + shared + plugin)
 ```
 
+## Send OpenCode through the confidential gateway
+
+Merge [`../../profiles/opencode.jsonc`](../../profiles/opencode.jsonc) into
+`~/.config/opencode/opencode.json` after starting the local gateway. Select
+`adverserial/lordx64/cyberglm`. OpenCode uses normal OpenAI-compatible
+streaming and function tools against `127.0.0.1`; the gateway sends only the
+resulting one-use entitlement and encrypted request to the runtime.
+
 Then register the built plugin with opencode — either project-local
 (`.opencode/plugins/adverserial.ts` in the repo) or global
 (`~/.config/opencode/plugins/adverserial.ts`). The file is a one-line shim

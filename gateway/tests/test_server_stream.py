@@ -13,7 +13,7 @@ class Stream:
         return iter(self.chunks)
 
 
-class TestHandler(Handler):
+class FixtureHandler(Handler):
     def __init__(self):
         self.wfile = io.BytesIO()
 
@@ -29,14 +29,14 @@ class TestHandler(Handler):
 
 class GatewayStreamTests(unittest.TestCase):
     def test_openai_emits_done_only_after_verified_receipt(self):
-        handler = TestHandler()
+        handler = FixtureHandler()
         handler._stream_openai(Stream([{"choices": [{"delta": {"content": "pong"}}]}]))
         wire = handler.wfile.getvalue()
         self.assertIn(b'"pong"', wire)
         self.assertTrue(wire.endswith(b"data: [DONE]\n\n"))
 
     def test_openai_emits_error_when_receipt_is_missing(self):
-        handler = TestHandler()
+        handler = FixtureHandler()
         handler._stream_openai(Stream([{"choices": []}], verified=False))
         wire = handler.wfile.getvalue()
         self.assertIn(b"confidential stream ended without a verified receipt", wire)
@@ -44,9 +44,31 @@ class GatewayStreamTests(unittest.TestCase):
 
     def test_claude_and_responses_streams_emit_native_event_names(self):
         chunk = {"choices": [{"delta": {"content": "pong"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
-        claude = TestHandler(); claude._stream_anthropic(Stream([chunk]), "lordx64/cyberglm")
-        responses = TestHandler(); responses._stream_responses(Stream([chunk]), "lordx64/cyberglm")
+        claude = FixtureHandler(); claude._stream_anthropic(Stream([chunk]), "lordx64/cyberglm")
+        responses = FixtureHandler(); responses._stream_responses(Stream([chunk]), "lordx64/cyberglm")
         self.assertIn(b"event: message_start", claude.wfile.getvalue())
         self.assertIn(b"event: message_stop", claude.wfile.getvalue())
         self.assertIn(b"event: response.created", responses.wfile.getvalue())
         self.assertIn(b"event: response.completed", responses.wfile.getvalue())
+
+    def test_claude_stream_preserves_tool_use_id_and_json_deltas(self):
+        chunks = [
+            {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_abc", "function": {"name": "read_file", "arguments": "{\"path\":"}}]}}]},
+            {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": "\"a.py\"}"}}]}}]},
+        ]
+        handler = FixtureHandler(); handler._stream_anthropic(Stream(chunks), "lordx64/cyberglm")
+        wire = handler.wfile.getvalue()
+        self.assertIn(b'"id":"toolu_call_abc"', wire)
+        self.assertIn(b'"type":"input_json_delta"', wire)
+        self.assertIn(b'"stop_reason":"tool_use"', wire)
+
+    def test_responses_stream_preserves_function_call_events(self):
+        chunks = [
+            {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_abc", "function": {"name": "read_file", "arguments": "{\"path\":"}}]}}]},
+            {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": "\"a.py\"}"}}]}}]},
+        ]
+        handler = FixtureHandler(); handler._stream_responses(Stream(chunks), "lordx64/cyberglm")
+        wire = handler.wfile.getvalue()
+        self.assertIn(b"event: response.function_call_arguments.delta", wire)
+        self.assertIn(b"event: response.function_call_arguments.done", wire)
+        self.assertIn(b'"call_id":"call_abc"', wire)

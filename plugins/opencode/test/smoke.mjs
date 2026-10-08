@@ -23,7 +23,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const expectUnpinned = process.argv.includes('--expect-unpinned');
+const expectUnpinned = process.argv.includes('--expect-unpinned') || (!process.env.ADVERSERIAL_TRUST_EVIDENCE_KEY && !process.env.ADVERSERIAL_RECEIPT_KEYS_JSON && !process.env.ADVERSERIAL_RECEIPT_KEYS_FILE);
 
 const mod = await import(pathToFileURL(path.join(HERE, '../dist/plugins/opencode/src/index.js')).href);
 const pluginFn = mod.AdverserialPlugin ?? mod.default;

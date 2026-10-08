@@ -1,20 +1,20 @@
 # Adverserial confidential gateway
 
-A loopback-only OpenAI-compatible gateway for the confidential endpoint. It is
-an **opt-in preview**: it does not replace `api.adverserial.ai`, and it refuses
-to send a prompt unless the endpoint attestation, pinned receipt key, TLS SPKI,
-and independent TDX/GPU verifier all pass.
+A loopback-only gateway for the confidential endpoint. It accepts the native
+wire protocol used by coding agents and refuses to send a prompt unless the
+endpoint attestation, pinned receipt key, TLS SPKI, and independent TDX/GPU
+verifier all pass.
 
 ## Data path
 
 ```
-client → 127.0.0.1 gateway → billing.adverserial.ai /cc/entitlements
-                           → api.adverserial.ai (direct TLS, CVM)
+coding agent → 127.0.0.1 gateway → billing.adverserial.ai /cc/entitlements
+                                  → configured direct TLS endpoint (CVM)
 ```
 
 The raw `sk-…` key ends at billing. The gateway receives an opaque five-minute,
-single-request entitlement and sends that to `api.adverserial.ai`; the model request never
-passes through Heroku's existing API shim or GPU proxy.
+single-request entitlement and sends that to `ADVERSERIAL_CC_API_URL`; the
+model request never passes through a general-purpose application relay.
 
 ## Install
 
@@ -36,18 +36,24 @@ Configure an OpenAI client with `base_url=http://127.0.0.1:8787/v1`, your
 normal Adverserial API key, and canonical model IDs only:
 `lordx64/cyberglm` or `lordx64/cyberkimi`.
 
-## Scope of this first release
+## Supported coding-agent protocols
 
-It handles OpenAI Chat Completions, Anthropic Messages, and OpenAI Responses, including receipt-verified SSE streaming, on the same loopback endpoint and fails closed. Each adapter
-converts to an OpenAI-compatible request locally, then follows the identical
-attestation → entitlement → pinned direct-TLS → signed-receipt path. Use:
+It handles OpenAI Chat Completions, Anthropic Messages, and OpenAI Responses,
+including receipt-verified SSE and structured function calls. Each adapter
+converts locally to a canonical OpenAI-compatible request, then follows the
+same attestation → entitlement → pinned direct-TLS → signed-receipt path:
 
 - OpenAI: `POST /v1/chat/completions`
 - Claude-compatible clients: `POST /v1/messages`
 - Codex-compatible clients: `POST /v1/responses`
 
-Image/document blocks, server-side Responses state, and hosted provider tools are intentionally rejected in this preview. Claude/Responses streaming currently supports text deltas; complex streamed tool-call events remain explicitly unsupported. They must not fall
-back to `api.adverserial.ai` silently, because that would weaken the stated
-confidential path.
+Function definitions, function calls, function call outputs, and streamed
+function argument deltas are preserved across Claude Messages and Responses.
+Image/document blocks, hosted provider tools, and provider-side conversation
+state are rejected deliberately. The caller must resend complete text and
+function-call history; this avoids keeping prompt history at the provider.
+
+See [`../profiles/`](../profiles/) for Claude Code, Codex, OpenCode, Pi, and
+Hermes setup.
 
 Please report security vulnerabilities privately to security@adverserial.ai.

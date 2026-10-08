@@ -1,9 +1,8 @@
 # Confidential client integrations
 
-These integrations verify an Adverserial confidential-inference endpoint
-before a coding client is configured to use it. They keep the current
-`https://api.adverserial.ai` integrations untouched: the confidential route is
-an explicit opt-in path through a local gateway, then directly to the CVM.
+These integrations verify an Adverserial confidential-inference endpoint and
+route the supported coding agents through the local receipt-verifying gateway.
+The gateway then connects directly to the attested runtime.
 
 A proxy receipt is not hardware proof. Every integration requires all of:
 
@@ -21,14 +20,15 @@ response.
 | [`adverserial-verify/`](adverserial-verify/) | Codex | Codex plugin skill that requires local verification before confidential use, plus a `/prompts:attestation` custom prompt |
 | [`claude-code/`](claude-code/) | Claude Code | `/adverserial-verify-claude:attestation` command, skill, SessionStart hook, and status-line badge (shares the kimi-code CLI build) |
 | [`opencode/`](opencode/) | OpenCode | Plugin tools: `adverserial_verify` and `adverserial_status` |
+| [`pi/`](pi/) | Pi | Provider extension gated on a fresh verification, plus an attestation command and tool |
 | [`kimi-code/`](kimi-code/) | Kimi Code | CLI, skill, SessionStart hook, `/adverserial-verify:attestation` command, and status-line badge |
 | [`hermes/`](hermes/) | Hermes Agent | Skill + `~/.hermes/config.yaml` alias wiring for the confidential gateway |
-| [`../gateway/`](../gateway/) | OpenAI-compatible local clients | Loopback-only gateway; API key → billing entitlement → direct attested endpoint |
+| [`../gateway/`](../gateway/) | Local confidential transport | Loopback-only gateway; API key → billing entitlement → direct attested endpoint |
 
-Claude Code and Codex Responses support stay on the existing shim while their
-mature adapters are extracted into the local gateway and regression-tested.
-That avoids changing working user traffic or falsely describing an adapter as
-confidential before it actually sends direct to the CVM.
+The native transport profiles are in [`../profiles/`](../profiles/): Claude
+Code uses `/v1/messages`, Codex uses `/v1/responses`, and OpenCode, Pi, and
+Hermes use `/v1/chat/completions`. All paths receive the same fresh runtime
+proof and signed inference-receipt enforcement from the gateway.
 
 ## Build
 

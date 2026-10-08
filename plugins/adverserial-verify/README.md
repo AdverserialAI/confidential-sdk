@@ -62,6 +62,22 @@ The verifier CLI itself is built from this repository's plugins workspace
 `plugins/kimi-code/bin/adverserial-verify`; put it on PATH as
 `adverserial-verify` for the smoothest experience).
 
+## Send Codex through the confidential gateway
+
+Copy [`../../profiles/codex.confidential.toml`](../../profiles/codex.confidential.toml)
+to `~/.codex/confidential.config.toml` and start Codex with the profile after
+the local gateway is running:
+
+```sh
+codex --profile confidential
+```
+
+The profile uses the native Responses endpoint and disables OpenAI-account
+fallback for this model. The gateway preserves Responses function calls and
+function-call outputs, streams function-argument events, obtains a one-use
+billing entitlement, and requires the final runtime receipt before a turn can
+complete.
+
 ## Environment
 
 ```sh

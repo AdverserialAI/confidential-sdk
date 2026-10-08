@@ -55,6 +55,23 @@ claude plugin install adverserial-verify-claude@adverserial
 (or, inside a session: `/plugin marketplace add /absolute/path/to/confidential-sdk`,
 then `/plugin install adverserial-verify-claude@adverserial`.)
 
+## Send Claude Code through the confidential gateway
+
+The plugin provides verification UX. Configure the actual inference transport
+as well, otherwise Claude Code continues to use its normal provider. Start
+`adverserial-confidential-gateway`, then source the maintained profile from
+the repository root:
+
+```sh
+source /absolute/path/to/confidential-sdk/profiles/claude-code.confidential.sh
+claude
+```
+
+This selects the gateway's native Anthropic Messages endpoint. It preserves
+function definitions, `tool_use`/`tool_result` history, streamed tool JSON,
+and text deltas. The gateway independently validates the fresh runtime proof
+before dispatch and the signed inference receipt before ending the stream.
+
 Installing from a local-path marketplace makes Claude Code load the plugin
 **in place** out of your checkout, so the `bin/` shim resolves the sibling
 build output. The same install covers the Claude Code CLI and the desktop
