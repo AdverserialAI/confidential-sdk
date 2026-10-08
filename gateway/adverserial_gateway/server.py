@@ -66,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
         self._sse({"type":"message_start","message":{"id":message_id,"type":"message","role":"assistant","model":model,"content":[],"stop_reason":None,"stop_sequence":None,"usage":{"input_tokens":0,"output_tokens":0}}}, "message_start")
         # GLM reasoning streams in delta.reasoning_content; map it to an
         # Anthropic thinking block at index 0, with text following at index 1.
-        index = 0; open_block = None
+        index = 0; open_block = None; saw_tool = False
         def close_block():
             nonlocal index, open_block
             if open_block is not None:
@@ -89,6 +89,22 @@ class Handler(BaseHTTPRequestHandler):
                         self._sse({"type":"content_block_start","index":index,"content_block":{"type":"thinking","thinking":""}}, "content_block_start")
                         open_block = "thinking"
                     self._sse({"type":"content_block_delta","index":index,"delta":{"type":"thinking_delta","thinking":thinking}}, "content_block_delta")
+                for call in (delta.get("tool_calls") or []):
+                    # OpenAI tool_calls stream as name first, then argument
+                    # fragments. Map to Anthropic tool_use blocks: open on the
+                    # name-bearing delta, stream arguments as input_json_delta.
+                    cid = call.get("id") if isinstance(call.get("id"), str) else ""
+                    fn = call.get("function") or {}
+                    name = fn.get("name") if isinstance(fn.get("name"), str) else ""
+                    args = fn.get("arguments") if isinstance(fn.get("arguments"), str) else ""
+                    if name:
+                        close_block()
+                        tool_id = "toolu_" + (cid or uuid.uuid4().hex)
+                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"tool_use","id":tool_id,"name":name,"input":{}}}, "content_block_start")
+                        open_block = "tool_use"
+                        saw_tool = True
+                    if args and open_block == "tool_use":
+                        self._sse({"type":"content_block_delta","index":index,"delta":{"type":"input_json_delta","partial_json":args}}, "content_block_delta")
                 if text:
                     if open_block != "text":
                         close_block()
@@ -99,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
             if not stream.receipt_verified:
                 raise ClientRequestError("confidential stream ended without a verified receipt")
             close_block()
-            self._sse({"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":None},"usage":{"output_tokens":usage.get("completion_tokens",0)}}, "message_delta")
+            self._sse({"type":"message_delta","delta":{"stop_reason":"tool_use" if saw_tool else "end_turn","stop_sequence":None},"usage":{"output_tokens":usage.get("completion_tokens",0)}}, "message_delta")
             self._sse({"type":"message_stop"}, "message_stop")
         except (GatewayError, VerificationError, ValueError, OSError) as exc:
             self._sse({"type":"error","error":{"type":"api_error","message":str(exc)}}, "error")

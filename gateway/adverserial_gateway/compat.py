@@ -104,7 +104,10 @@ def chat_to_anthropic(response: Mapping[str, Any], model: str) -> dict[str, Any]
             args = json.loads(fn.get("arguments") or "{}")
         except (TypeError, ValueError):
             args = {}
-        content.append({"type": "tool_use", "id": call.get("id", "toolu_confidential"), "name": fn.get("name", "tool"), "input": args if isinstance(args, dict) else {}})
+        call_id = call.get("id") if isinstance(call.get("id"), str) else ""
+        # Anthropic tool_use ids carry the toolu_ prefix; map the upstream id.
+        tool_id = "toolu_" + (call_id or uuid.uuid4().hex)
+        content.append({"type": "tool_use", "id": tool_id, "name": fn.get("name", "tool"), "input": args if isinstance(args, dict) else {}})
     if not content:
         content = [{"type": "text", "text": ""}]
     usage = response.get("usage") or {}
