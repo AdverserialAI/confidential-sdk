@@ -62,6 +62,22 @@ class GatewayStreamTests(unittest.TestCase):
         self.assertIn(b'"type":"input_json_delta"', wire)
         self.assertIn(b'"stop_reason":"tool_use"', wire)
 
+    def test_claude_streams_thinking_then_tool_call_with_a_terminal_stop(self):
+        chunks = [
+            {"choices": [{"delta": {"reasoning_content": "I will inspect the files."}}]},
+            {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_bash", "function": {"name": "Bash", "arguments": "{\"command\":\"ls\"}"}}]}}]},
+        ]
+        handler = FixtureHandler(); handler._stream_anthropic(Stream(chunks), "lordx64/cyberglm")
+        wire = handler.wfile.getvalue()
+        thinking_start = wire.index(b'"type":"thinking"')
+        tool_start = wire.index(b'"type":"tool_use"')
+        self.assertLess(thinking_start, tool_start)
+        self.assertIn(b'"type":"thinking_delta"', wire)
+        self.assertIn(b'"type":"signature_delta"', wire)
+        self.assertIn(b'"name":"Bash"', wire)
+        self.assertIn(b'"stop_reason":"tool_use"', wire)
+        self.assertTrue(wire.endswith(b'event: message_stop\ndata: {"type":"message_stop"}\n\n'))
+
     def test_responses_stream_preserves_function_call_events(self):
         chunks = [
             {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_abc", "function": {"name": "read_file", "arguments": "{\"path\":"}}]}}]},
