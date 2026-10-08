@@ -27,6 +27,23 @@ def _text(blocks: Any) -> str:
     for block in blocks:
         if isinstance(block, Mapping) and block.get("type") in {"thinking", "redacted_thinking"}:
             continue  # thinking blocks are dropped at the confidential boundary
+        if isinstance(block, Mapping) and block.get("type") == "tool_result":
+            # Tool output returns to the model as user-role text. The content
+            # may be a string or a list of text blocks.
+            inner = block.get("content")
+            text = _text(inner) if isinstance(inner, list) else (inner if isinstance(inner, str) else "")
+            parts.append(f"[tool result]\n{text}")
+            continue
+        if isinstance(block, Mapping) and block.get("type") == "tool_use":
+            # The assistant's own tool call, returning in history. Keep the
+            # call visible so the model has continuity, as text.
+            name = block.get("name") if isinstance(block.get("name"), str) else "tool"
+            try:
+                args = json.dumps(block.get("input") or {}, separators=(",", ":"))
+            except (TypeError, ValueError):
+                args = "{}"
+            parts.append(f"[tool call: {name}] {args}")
+            continue
         if not isinstance(block, Mapping) or block.get("type") != "text" or not isinstance(block.get("text"), str):
             raise ClientRequestError("only text content is available through the confidential preview")
         parts.append(block["text"])
