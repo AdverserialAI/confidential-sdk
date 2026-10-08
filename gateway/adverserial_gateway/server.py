@@ -135,6 +135,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+        # Shape-only request log: method, path, and outcome — never content,
+        # headers, or keys. This is the local debugging trail.
+        log = getattr(self.server, "logger", None) or (lambda *a: print(*a, flush=True))
+        log(f"[gateway] POST {path}")
         if path not in {"/v1/chat/completions", "/v1/messages", "/v1/responses", "/responses"}:
             return self._json(HTTPStatus.NOT_FOUND, {"error": {"message": "Unsupported local gateway endpoint"}})
         length = self.headers.get("content-length")
@@ -172,8 +176,10 @@ class Handler(BaseHTTPRequestHandler):
                 if streaming: return self._stream_openai(result)
                 self._json(HTTPStatus.OK, dict(result))
         except GatewayError as exc:
+            log(f"[gateway] POST {path} -> {exc.status_code} {exc}")
             self._json(exc.status_code, {"error": {"type": "confidential_gateway_error", "message": str(exc)}})
         except (ValueError, TypeError) as exc:
+            log(f"[gateway] POST {path} -> 400 {exc}")
             self._json(HTTPStatus.BAD_REQUEST, {"error": {"message": str(exc)}})
 
 
