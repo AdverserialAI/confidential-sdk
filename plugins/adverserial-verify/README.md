@@ -21,7 +21,32 @@ adverserial-verify/
 └── prompts/attestation.md            # custom prompt → /prompts:attestation
 ```
 
-## Install the slash prompt
+## Install in Codex
+
+Install the public GitHub marketplace, then add the plugin:
+
+```sh
+codex plugin marketplace add AdverserialAI/confidential-sdk --ref main
+codex plugin add adverserial-verify@adverserial
+```
+
+Restart Codex so it loads the installed skill. In a chat, invoke
+`$adverserial-verify` to request a fresh attestation check. This is the
+supported command surface: Codex skills are the replacement for the older
+custom-prompt slash-command mechanism.
+
+The plugin includes the verifier executable. `$adverserial-verify` finds and
+runs the installed bundle automatically. To run it directly from a repository
+checkout, use:
+
+```sh
+plugins/adverserial-verify/bin/adverserial-verify
+```
+
+The command must produce a pinned, hardware-verified result before Codex
+treats the endpoint as confidential.
+
+## Legacy slash prompt
 
 Custom prompts live in the Codex home directory and become slash commands
 named after the file. Install once for both Codex CLI and the Codex desktop
@@ -35,15 +60,14 @@ cp prompts/attestation.md ~/.codex/prompts/
 Restart Codex (new CLI session, or reopen the app chat) so it loads the
 file, then invoke it as `/prompts:attestation`. It runs the verifier CLI and
 reports the verdict table verbatim — a failed or UNPINNED (TOFU) verdict is
-never paraphrased as verified.
+never paraphrased as verified. Use this only where an older Codex install does
+not yet support skills.
 
 Notes:
 
-- OpenAI now [deprecates custom prompts in favor of
-  skills](https://developers.openai.com/codex/custom-prompts); the bundled
-  `adverserial-verify` skill below covers the same behavior and can also be
-  invoked implicitly. The prompt remains for users who want an explicit
-  slash command.
+- The bundled `adverserial-verify` skill is the preferred explicit command
+  (`$adverserial-verify`) and is also invoked implicitly for confidential
+  endpoint setup.
 - Some desktop builds have a known issue surfacing `~/.codex/prompts` files
   in the slash menu; the CLI is unaffected, and the skill works regardless.
 
@@ -73,10 +97,11 @@ codex --profile confidential
 ```
 
 The profile uses the native Responses endpoint and disables OpenAI-account
-fallback for this model. The gateway preserves Responses function calls and
-function-call outputs, streams function-argument events, obtains a one-use
-billing entitlement, and requires the final runtime receipt before a turn can
-complete.
+fallback for this model. It pins every request to `lordx64/cyberglm`; Codex
+must not substitute an OpenAI model alias. The gateway preserves Responses
+function calls and function-call outputs, streams function-argument events,
+obtains a one-use billing entitlement, and requires the final runtime receipt
+before a turn can complete.
 
 ## Environment
 

@@ -1,0 +1,20 @@
+{
+  "name": "adverserial",
+  "interface": {
+    "displayName": "Adverserial AI"
+  },
+  "plugins": [
+    {
+      "name": "adverserial-verify",
+      "source": {
+        "source": "local",
+        "path": "./plugins/adverserial-verify"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer tools"
+    }
+  ]
+}

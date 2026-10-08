@@ -1,6 +1,6 @@
 {
   "name": "adverserial-verify",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Verify Adverserial confidential-inference evidence before a coding client sends prompts.",
   "author": {"name": "Adverserial AI"},
   "skills": "./skills/",
