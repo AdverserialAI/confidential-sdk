@@ -31,6 +31,28 @@ class VerificationFailed(GatewayError):
     status_code = 503
 
 
+def canonical_model_id(model: str) -> str:
+    """Return the runtime model used for a locally supported client model.
+
+    Claude Code assigns model names to its background roles independently of
+    the main session.  Those requests still arrive at this loopback-only
+    gateway, where all Claude-family aliases deliberately resolve to the one
+    configured confidential runtime.  Nothing beyond the gateway sees an
+    alias: evidence verification, entitlement issuance, EHBP encryption, and
+    the attested proxy all receive the canonical model ID.
+
+    Do not broaden this into a general compatibility fallback.  An unknown
+    provider model must remain an error so a typo cannot silently select a
+    different confidential policy.
+    """
+    if model in CANONICAL_MODELS:
+        return model
+    normalized = model.strip().lower()
+    if normalized == "cyberglm" or normalized.startswith("claude-"):
+        return "lordx64/cyberglm"
+    raise ClientRequestError("Use a canonical confidential model ID: lordx64/cyberglm or lordx64/cyberkimi.")
+
+
 @dataclass
 class ProofCache:
     proof: VerifiedProof | None = None
@@ -45,8 +67,7 @@ class Dispatcher:
         self._proofs: dict[str, ProofCache] = {model: ProofCache() for model in CANONICAL_MODELS}
 
     def proof_for(self, model: str) -> VerifiedProof:
-        if model not in CANONICAL_MODELS:
-            raise ClientRequestError("Use a canonical confidential model ID: lordx64/cyberglm or lordx64/cyberkimi.")
+        model = canonical_model_id(model)
         cached = self._proofs[model]
         if cached.fresh_for(model):
             return cached.proof  # type: ignore[return-value]
@@ -110,6 +131,7 @@ class Dispatcher:
         model = payload.get("model")
         if not isinstance(model, str):
             raise ClientRequestError("model is required")
+        model = canonical_model_id(model)
         if not api_key.startswith("sk-") or len(api_key) < 20:
             raise AuthorizationError("A normal Adverserial API key is required.")
         # The JSON wire body is a safe upper bound on token count for text JSON:
@@ -174,5 +196,5 @@ class Dispatcher:
     def adapted_completion(self, api_key: str, model: str, payload: Mapping[str, Any]):
         """Dispatch a locally translated request after binding it to a canonical model."""
         outbound = dict(payload)
-        outbound["model"] = model
+        outbound["model"] = canonical_model_id(model)
         return self.completion(api_key, outbound)

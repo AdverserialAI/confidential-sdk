@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from adverserial_gateway.config import Config
-from adverserial_gateway.core import ClientRequestError, Dispatcher
+from adverserial_gateway.core import ClientRequestError, Dispatcher, canonical_model_id
 
 
 class CoreTests(unittest.TestCase):
@@ -22,9 +22,26 @@ class CoreTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_only_canonical_models_can_reach_the_entitlement_exchange(self):
+    def test_unknown_models_cannot_reach_the_entitlement_exchange(self):
         with self.assertRaises(ClientRequestError):
-            self.dispatcher.completion("sk-" + "x" * 24, {"model": "cyberglm", "messages": []})
+            self.dispatcher.completion("sk-" + "x" * 24, {"model": "gpt-5", "messages": []})
+
+    def test_claude_child_model_aliases_resolve_to_canonical_cyberglm(self):
+        self.assertEqual(canonical_model_id("claude-haiku-4-5-20251001"), "lordx64/cyberglm")
+        self.assertEqual(canonical_model_id("claude-sonnet-4-6"), "lordx64/cyberglm")
+        self.assertEqual(canonical_model_id("cyberglm"), "lordx64/cyberglm")
+
+    def test_claude_alias_is_canonicalized_before_proof_entitlement_and_runtime(self):
+        proof = object()
+        payload = {"model": "claude-haiku-4-5-20251001", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 12}
+        with patch.object(self.dispatcher, "proof_for", return_value=proof) as proof_for, patch.object(
+            self.dispatcher, "entitlement", return_value="signed-entitlement"
+        ) as entitlement, patch("adverserial_gateway.core.VerifiedSession") as session:
+            session.return_value.chat_completions.return_value = {"id": "ok"}
+            self.dispatcher.completion("sk-" + "x" * 24, payload)
+        self.assertEqual(proof_for.call_args.args[0], "lordx64/cyberglm")
+        self.assertEqual(entitlement.call_args.args[1], "lordx64/cyberglm")
+        self.assertEqual(session.return_value.chat_completions.call_args.kwargs["model"], "lordx64/cyberglm")
 
     def test_gateway_replaces_api_key_with_entitlement_before_direct_call(self):
         proof = object()

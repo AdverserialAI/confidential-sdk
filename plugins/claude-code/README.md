@@ -72,6 +72,11 @@ function definitions, `tool_use`/`tool_result` history, streamed tool JSON,
 and text deltas. The gateway independently validates the fresh runtime proof
 before dispatch and the signed inference receipt before ending the stream.
 
+The profile also pins Claude Code's background and small/fast agent roles to
+`lordx64/cyberglm`. As a compatibility safeguard, the loopback gateway maps
+only Claude-family child-model aliases to that canonical ID before it verifies
+the runtime or requests an entitlement; no alias reaches billing or the CVM.
+
 Installing from a local-path marketplace makes Claude Code load the plugin
 **in place** out of your checkout, so the `bin/` shim resolves the sibling
 build output. The same install covers the Claude Code CLI and the desktop

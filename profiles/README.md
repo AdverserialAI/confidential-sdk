@@ -46,6 +46,11 @@ The Claude plugin supplies the independent `adverserial-verify` UX; the
 gateway makes the actual prompt path fail closed when runtime evidence or the
 final receipt does not validate.
 
+The profile pins Claude Code's interactive, background-agent, and small/fast
+roles to `lordx64/cyberglm`. The local gateway also normalizes Claude-family
+child model aliases before verification and entitlement issuance, so the
+attested runtime only ever receives the canonical model ID.
+
 ## Codex
 
 Copy the file to `$CODEX_HOME/confidential.config.toml` (normally
