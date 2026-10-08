@@ -16,7 +16,8 @@
     "kimi.plugin.json"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-cli-bundle.mjs"
+    "build": "tsc -p tsconfig.json && node scripts/build-cli-bundle.mjs",
+    "prebuild": "npm --prefix ../../typescript install --no-audit --no-fund"
   },
   "engines": {
     "node": ">=18"
