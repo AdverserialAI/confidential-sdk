@@ -21,39 +21,27 @@ claude-code/
 ├── hooks/hooks.json                  # SessionStart hook → bin/adverserial-verify
 ├── commands/attestation.md           # /adverserial-verify-claude:attestation
 ├── skills/adverserial-verify/SKILL.md
-├── bin/adverserial-verify            # shim → plugins/kimi-code/dist (shared build output)
+├── bin/adverserial-verify            # shim → bundled verifier CLI
 ├── bin/adverserial-statusline.mjs    # network-free statusLine badge renderer
-└── package.json                      # ESM marker + metadata; no build of its own
+└── package.json                      # ESM marker + metadata
 ```
 
-The verifier CLI is **not recompiled here**: `bin/adverserial-verify` is a
-shim into the self-contained CLI that the plugins workspace build already
-emits at `plugins/kimi-code/dist/plugins/kimi-code/src/cli.js`. That keeps
-one implementation across harnesses — and it means this plugin only works
-from a built checkout of this repository (see the install note below).
+`bin/adverserial-verify` loads the self-contained verifier bundle tracked in
+this plugin directory. It works from a local checkout and from Claude Code's
+versioned GitHub marketplace cache.
 
 ## Install
 
-Build the plugins workspace first (the CLI ships as compiled output, not
-source):
+Register the public GitHub marketplace and install the plugin:
 
 ```sh
-git clone https://github.com/AdverserialAI/confidential-sdk.git
-cd confidential-sdk/plugins
-npm install
-npm run build            # tsc; emits the shared verifier CLI that bin/ shims into
-```
-
-Then register the repository as a Claude Code plugin marketplace **from the
-local path** and install the plugin:
-
-```sh
-claude plugin marketplace add /absolute/path/to/confidential-sdk
+claude plugin marketplace add AdverserialAI/confidential-sdk --ref main
 claude plugin install adverserial-verify-claude@adverserial
 ```
 
-(or, inside a session: `/plugin marketplace add /absolute/path/to/confidential-sdk`,
-then `/plugin install adverserial-verify-claude@adverserial`.)
+(or, inside a session: `/plugin marketplace add AdverserialAI/confidential-sdk`,
+then `/plugin install adverserial-verify-claude@adverserial`.) Restart Claude
+Code, or run `/reload-plugins` in an existing session.
 
 ## Send Claude Code through the confidential gateway
 
@@ -77,19 +65,9 @@ The profile also pins Claude Code's background and small/fast agent roles to
 only Claude-family child-model aliases to that canonical ID before it verifies
 the runtime or requests an entitlement; no alias reaches billing or the CVM.
 
-Installing from a local-path marketplace makes Claude Code load the plugin
-**in place** out of your checkout, so the `bin/` shim resolves the sibling
-build output. The same install covers the Claude Code CLI and the desktop
-app — both read `~/.claude`. New sessions get the components; in a running
-session run `/reload-plugins`.
-
-> **GitHub marketplace caveat.** `/plugin marketplace add AdverserialAI/confidential-sdk`
-> also works (the repo root carries `.claude-plugin/marketplace.json`), but
-> Claude Code then copies only the plugin directory into its cache — files
-> outside it, including the built CLI under `plugins/kimi-code/dist/`, are
-> not copied, and `dist/` is not committed to git. In that mode the
-> SessionStart hook and `bin/adverserial-verify` print a build hint instead
-> of verifying. Use the local-path install above for a working verifier.
+The same GitHub install covers the Claude Code CLI and desktop app — both
+read <code>~/.claude</code>. The plugin cache includes the verifier bundle, so
+no local TypeScript build or sibling checkout is required for attestation.
 
 ### What you get
 

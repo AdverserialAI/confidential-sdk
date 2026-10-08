@@ -9,7 +9,7 @@
     {
       "name": "adverserial-verify-claude",
       "source": "./plugins/claude-code",
-      "description": "Verify the attestation of the Adverserial confidential inference endpoint (TDX evidence + ES256 receipt) before trusting it with sensitive prompts. Requires a built checkout: run `npm install && npm run build` in plugins/ and add this marketplace from the local path — see plugins/claude-code/README.md."
+      "description": "Verify the attestation of the Adverserial confidential inference endpoint (TDX evidence + ES256 receipt) before trusting it with sensitive prompts. Includes a self-contained verifier, SessionStart hook, slash command, skill, and status-line renderer — see plugins/claude-code/README.md."
     }
   ]
 }

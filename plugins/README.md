@@ -17,8 +17,8 @@ response.
 
 | Directory | Client | Integration |
 | --- | --- | --- |
-| [`adverserial-verify/`](adverserial-verify/) | Codex | Codex plugin skill that requires local verification before confidential use, plus a `/prompts:attestation` custom prompt |
-| [`claude-code/`](claude-code/) | Claude Code | `/adverserial-verify-claude:attestation` command, skill, SessionStart hook, and status-line badge (shares the kimi-code CLI build) |
+| [`adverserial-verify/`](adverserial-verify/) | Codex | Bundled verifier plus the `$adverserial-verify` skill. Install with `codex plugin marketplace add AdverserialAI/confidential-sdk --ref main` then `codex plugin add adverserial-verify@adverserial`. |
+| [`claude-code/`](claude-code/) | Claude Code | Self-contained verifier, `/adverserial-verify-claude:attestation` command, skill, SessionStart hook, and status-line badge. Install from the public `AdverserialAI/confidential-sdk` marketplace. |
 | [`opencode/`](opencode/) | OpenCode | Plugin tools: `adverserial_verify` and `adverserial_status` |
 | [`pi/`](pi/) | Pi | Provider extension gated on a fresh verification, plus an attestation command and tool |
 | [`kimi-code/`](kimi-code/) | Kimi Code | CLI, skill, SessionStart hook, `/adverserial-verify:attestation` command, and status-line badge |
