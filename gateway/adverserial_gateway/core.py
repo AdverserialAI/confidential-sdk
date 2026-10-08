@@ -120,7 +120,7 @@ class Dispatcher:
         serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         max_input = 2 * len(serialized) + 4096
         if not 1 <= max_input <= self.config.max_input_tokens:
-            raise ClientRequestError("Request exceeds the confidential input policy.")
+            raise ClientRequestError(f"Request exceeds the confidential input policy: {max_input} bytes reserved (limit {self.config.max_input_tokens}).")
         requested_output = payload.get("max_tokens", 4096)
         if isinstance(requested_output, bool) or not isinstance(requested_output, int) or requested_output < 1:
             raise ClientRequestError("max_tokens must be a positive integer")

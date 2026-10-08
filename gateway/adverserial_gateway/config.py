@@ -78,6 +78,6 @@ class Config:
             audience=env.get("ADVERSERIAL_AUDIENCE", "https://chat.adverserial.ai"),
             receipt_keys=data,
             hardware_verifier_command=command,
-            max_input_tokens=_positive_int("ADVERSERIAL_MAX_INPUT_TOKENS", env.get("ADVERSERIAL_MAX_INPUT_TOKENS", "1048576"), 1048576),
+            max_input_tokens=_positive_int("ADVERSERIAL_MAX_INPUT_TOKENS", env.get("ADVERSERIAL_MAX_INPUT_TOKENS", "6291456"), 6291456),
             max_output_tokens=_positive_int("ADVERSERIAL_MAX_OUTPUT_TOKENS", env.get("ADVERSERIAL_MAX_OUTPUT_TOKENS", "65536"), 65536),
         )
