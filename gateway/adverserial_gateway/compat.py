@@ -35,8 +35,10 @@ def anthropic_to_chat(payload: Mapping[str, Any]) -> dict[str, Any]:
     if system:
         messages.append({"role": "system", "content": _text(system)})
     for message in payload.get("messages", []):
-        if not isinstance(message, Mapping) or message.get("role") not in {"user", "assistant"}:
-            raise ClientRequestError("Anthropic messages must use user or assistant roles")
+        # Claude Code ≥2.1 also carries system-role context entries inside the
+        # messages array; accept them alongside user/assistant.
+        if not isinstance(message, Mapping) or message.get("role") not in {"user", "assistant", "system"}:
+            raise ClientRequestError("Anthropic messages must use user, assistant, or system roles")
         messages.append({"role": message["role"], "content": _text(message.get("content", ""))})
     if not messages:
         raise ClientRequestError("at least one message is required")
