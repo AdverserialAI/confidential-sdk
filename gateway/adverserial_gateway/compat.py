@@ -8,6 +8,8 @@ than being silently discarded.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import time
 import uuid
@@ -23,6 +25,8 @@ def _text(blocks: Any) -> str:
         raise ClientRequestError("content must be text or a list of supported text blocks")
     parts: list[str] = []
     for block in blocks:
+        if isinstance(block, Mapping) and block.get("type") in {"thinking", "redacted_thinking"}:
+            continue  # thinking blocks are dropped at the confidential boundary
         if not isinstance(block, Mapping) or block.get("type") != "text" or not isinstance(block.get("text"), str):
             raise ClientRequestError("only text content is available through the confidential preview")
         parts.append(block["text"])
@@ -68,9 +72,16 @@ def chat_to_anthropic(response: Mapping[str, Any], model: str) -> dict[str, Any]
         raise ClientRequestError("confidential endpoint returned invalid completion choices")
     message = choice.get("message") or {}
     content: list[dict[str, Any]] = []
+    # GLM-style reasoning rides in reasoning_content; surface it as an
+    # Anthropic thinking block so Claude Code renders the reasoning instead of
+    # an empty reply. The signature is a local content marker — nothing
+    # verifies it, and thinking blocks are dropped on the way back in.
+    if isinstance(message, Mapping) and isinstance(message.get("reasoning_content"), str) and message["reasoning_content"]:
+        thinking = message["reasoning_content"]
+        content.append({"type": "thinking", "thinking": thinking, "signature": base64.b64encode(hashlib.sha256(thinking.encode()).digest()).decode()})
     if isinstance(message, Mapping) and message.get("content") is not None:
         content.append({"type": "text", "text": str(message.get("content") or "")})
-    for call in message.get("tool_calls", []) if isinstance(message, Mapping) else []:
+    for call in (message.get("tool_calls") or []) if isinstance(message, Mapping) else []:
         fn = call.get("function", {}) if isinstance(call, Mapping) else {}
         try:
             args = json.loads(fn.get("arguments") or "{}")

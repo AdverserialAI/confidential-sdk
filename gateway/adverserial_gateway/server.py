@@ -64,19 +64,41 @@ class Handler(BaseHTTPRequestHandler):
     def _stream_anthropic(self, stream, model: str):
         self._sse_start(); message_id = "msg_" + uuid.uuid4().hex
         self._sse({"type":"message_start","message":{"id":message_id,"type":"message","role":"assistant","model":model,"content":[],"stop_reason":None,"stop_sequence":None,"usage":{"input_tokens":0,"output_tokens":0}}}, "message_start")
-        self._sse({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}, "content_block_start")
+        # GLM reasoning streams in delta.reasoning_content; map it to an
+        # Anthropic thinking block at index 0, with text following at index 1.
+        index = 0; open_block = None
+        def close_block():
+            nonlocal index, open_block
+            if open_block is not None:
+                if open_block == "thinking":
+                    # Anthropic clients expect a signature before the thinking
+                    # block closes; nothing verifies it on this path.
+                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"signature_delta","signature":""}}, "content_block_delta")
+                self._sse({"type":"content_block_stop","index":index}, "content_block_stop")
+                index += 1; open_block = None
         try:
             usage = {}
             for chunk in stream:
                 choice = (chunk.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
+                thinking = delta.get("reasoning_content")
                 text = delta.get("content")
+                if thinking:
+                    if open_block != "thinking":
+                        close_block()
+                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"thinking","thinking":""}}, "content_block_start")
+                        open_block = "thinking"
+                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"thinking_delta","thinking":thinking}}, "content_block_delta")
                 if text:
-                    self._sse({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":text}}, "content_block_delta")
+                    if open_block != "text":
+                        close_block()
+                        self._sse({"type":"content_block_start","index":index,"content_block":{"type":"text","text":""}}, "content_block_start")
+                        open_block = "text"
+                    self._sse({"type":"content_block_delta","index":index,"delta":{"type":"text_delta","text":text}}, "content_block_delta")
                 usage = chunk.get("usage") or usage
             if not stream.receipt_verified:
                 raise ClientRequestError("confidential stream ended without a verified receipt")
-            self._sse({"type":"content_block_stop","index":0}, "content_block_stop")
+            close_block()
             self._sse({"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":None},"usage":{"output_tokens":usage.get("completion_tokens",0)}}, "message_delta")
             self._sse({"type":"message_stop"}, "message_stop")
         except (GatewayError, VerificationError, ValueError, OSError) as exc:
