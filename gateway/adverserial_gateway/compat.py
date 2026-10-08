@@ -79,8 +79,8 @@ def chat_to_anthropic(response: Mapping[str, Any], model: str) -> dict[str, Any]
     if isinstance(message, Mapping) and isinstance(message.get("reasoning_content"), str) and message["reasoning_content"]:
         thinking = message["reasoning_content"]
         content.append({"type": "thinking", "thinking": thinking, "signature": base64.b64encode(hashlib.sha256(thinking.encode()).digest()).decode()})
-    if isinstance(message, Mapping) and message.get("content") is not None:
-        content.append({"type": "text", "text": str(message.get("content") or "")})
+    if isinstance(message, Mapping) and message.get("content"):
+        content.append({"type": "text", "text": str(message["content"])})
     for call in (message.get("tool_calls") or []) if isinstance(message, Mapping) else []:
         fn = call.get("function", {}) if isinstance(call, Mapping) else {}
         try:
