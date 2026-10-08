@@ -35,7 +35,7 @@ versioned GitHub marketplace cache.
 Register the public GitHub marketplace and install the plugin:
 
 ```sh
-claude plugin marketplace add AdverserialAI/confidential-sdk --ref main
+claude plugin marketplace add AdverserialAI/confidential-sdk
 claude plugin install adverserial-verify-claude@adverserial
 ```
 
