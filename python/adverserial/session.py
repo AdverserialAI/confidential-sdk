@@ -41,11 +41,23 @@ from ._jws import b64url_encode, parse_compact_jws, verify_es256
 from ._tls import PinnedHTTPSConnection
 from .verify import VerificationError, VerifiedProof
 
-__all__ = ["CompletionResponse", "ReceiptStream", "VerifiedSession"]
+__all__ = ["CompletionResponse", "ReceiptStream", "UpstreamHTTPError", "VerifiedSession"]
 
 
 def _sha256_b64(data: bytes) -> str:
     return "sha256:" + b64url_encode(hashlib.sha256(data).digest())
+
+
+class UpstreamHTTPError(VerificationError):
+    """The enclave answered a dispatched chat-completions request with a
+    non-200 status. Carries the upstream status so callers can distinguish a
+    pre-generation rejection (4xx: the reservation can be released safely)
+    from a mid-generation failure (5xx: the outcome is unknown and the
+    reservation settles through the proxy's terminal meter event)."""
+
+    def __init__(self, status: int, detail: str) -> None:
+        self.status = status
+        super().__init__(f"POST /chat/completions failed with HTTP {status}: {detail}")
 
 
 class CompletionResponse(dict):
@@ -142,6 +154,10 @@ class VerifiedSession:
             raise VerificationError("a short-lived confidential entitlement is required; do not send a platform API key to the CVM")
         if require_receipts and not proof.attestation_state_digest:
             raise VerificationError("VerifiedSession requires attestation_state_digest to verify inference receipts")
+        # Flipped immediately before request bytes are written to the enclave.
+        # Once True, a failure is outcome-unknown: the request may have reached
+        # the proxy, so the billing reservation must not be released locally.
+        self.dispatched = False
 
     @property
     def proof(self) -> VerifiedProof:
@@ -247,12 +263,13 @@ class VerifiedSession:
         try:
             headers = self._headers({"Content-Type": "application/json", "X-Adverserial-Nonce": nonce})
             headers[ENCAPSULATED_KEY_HEADER] = encrypted.encapsulated_key.hex()
+            self.dispatched = True
             connection.request("POST", self._base_path + "/chat/completions", body=encrypted.body, headers=headers)
             response = connection.getresponse()
             wire_body = response.read()
             receipt_token = response.getheader("X-Adverserial-Receipt")
             if response.status != 200:
-                raise VerificationError(f"POST /chat/completions failed with HTTP {response.status}: {wire_body[:200].decode('utf-8', 'replace')}")
+                raise UpstreamHTTPError(response.status, wire_body[:200].decode("utf-8", "replace"))
             try:
                 response_nonce = response.getheader(RESPONSE_NONCE_HEADER)
                 if not response_nonce:
@@ -279,6 +296,7 @@ class VerifiedSession:
             headers = self._headers({"Content-Type": "application/json"})
             if nonce:
                 headers["X-Adverserial-Nonce"] = nonce
+            self.dispatched = True
             connection.request(
                 "POST", self._base_path + "/chat/completions", body=body, headers=headers
             )
@@ -286,10 +304,7 @@ class VerifiedSession:
             data = response.read()
             receipt_token = response.getheader("X-Adverserial-Receipt")
             if response.status != 200:
-                raise VerificationError(
-                    f"POST /chat/completions failed with HTTP {response.status}: "
-                    f"{data[:200].decode('utf-8', 'replace')}"
-                )
+                raise UpstreamHTTPError(response.status, data[:200].decode("utf-8", "replace"))
             claims: Optional[Dict[str, Any]] = None
             verified = False
             if receipt_token:
@@ -328,15 +343,13 @@ class VerifiedSession:
         connection = self._connect()
         headers = self._headers({"Content-Type": "application/json", "Accept": "text/event-stream", "X-Adverserial-Nonce": nonce})
         headers[ENCAPSULATED_KEY_HEADER] = encrypted.encapsulated_key.hex()
+        self.dispatched = True
         connection.request("POST", self._base_path + "/chat/completions", body=encrypted.body, headers=headers)
         response = connection.getresponse()
         if response.status != 200:
             data = response.read()
             connection.close()
-            raise VerificationError(
-                f"POST /chat/completions failed with HTTP {response.status}: "
-                f"{data[:200].decode('utf-8', 'replace')}"
-            )
+            raise UpstreamHTTPError(response.status, data[:200].decode("utf-8", "replace"))
         nonce_header = response.getheader(RESPONSE_NONCE_HEADER)
         if not nonce_header:
             connection.close()
@@ -409,6 +422,7 @@ class VerifiedSession:
         )
         if nonce:
             headers["X-Adverserial-Nonce"] = nonce
+        self.dispatched = True
         connection.request(
             "POST", self._base_path + "/chat/completions", body=body, headers=headers
         )
@@ -416,10 +430,7 @@ class VerifiedSession:
         if response.status != 200:
             data = response.read()
             connection.close()
-            raise VerificationError(
-                f"POST /chat/completions failed with HTTP {response.status}: "
-                f"{data[:200].decode('utf-8', 'replace')}"
-            )
+            raise UpstreamHTTPError(response.status, data[:200].decode("utf-8", "replace"))
 
         stream = ReceiptStream()
 

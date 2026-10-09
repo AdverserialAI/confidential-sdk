@@ -22,7 +22,7 @@ hardware. Never treat a dev_mode proof as a TEE guarantee.
 from ._canonjson import canonical_json, evidence_digest
 from ._jws import b64url_decode, b64url_encode, jwk_thumbprint
 from ._tls import TLSPinMismatchError, spki_sha256_from_cert_der
-from .session import VerifiedSession
+from .session import UpstreamHTTPError, VerifiedSession
 from .verify import (
     HardwareEvidenceVerifier,
     HardwareVerification,
@@ -39,6 +39,7 @@ __all__ = [
     "VerifiedProof",
     "VerifiedSession",
     "VerificationError",
+    "UpstreamHTTPError",
     "HardwareEvidenceVerifier",
     "HardwareVerification",
     "TLSPinMismatchError",

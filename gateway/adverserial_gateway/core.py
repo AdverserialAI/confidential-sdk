@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
-from adverserial import VerificationError, VerifiedProof, VerifiedSession, verify_endpoint
+from adverserial import UpstreamHTTPError, VerificationError, VerifiedProof, VerifiedSession, verify_endpoint
 
 from .config import CANONICAL_MODELS, Config
 from .hardware import verifier_from_command
@@ -29,6 +29,23 @@ class AuthorizationError(GatewayError):
 
 class VerificationFailed(GatewayError):
     status_code = 503
+
+
+class UpstreamRejected(GatewayError):
+    """The enclave answered with a non-200 before generation (4xx), or failed
+    after the request was dispatched (5xx). 4xx reservations are released;
+    5xx reservations settle through the proxy's terminal meter event."""
+
+    status_code = 502
+
+
+class OutcomeUnknownError(GatewayError):
+    """The request reached the enclave and its outcome is unknown (timeout,
+    connection drop, receipt failure). The proxy's terminal meter event
+    settles the reservation; a blind retry may run a second, separately
+    billed generation."""
+
+    status_code = 502
 
 
 def canonical_model_id(model: str) -> str:
@@ -158,17 +175,30 @@ class Dispatcher:
             return session.chat_completions(outbound.pop("messages", []), model=model, stream=stream, **outbound)
         except Exception as exc:
             # Release the billing reservation only when the request provably
-            # never ran at the enclave: local setup failures, or a 4xx from
-            # the gate (the request was rejected before any generation, so no
-            # meter event will arrive to settle it). Never release after a
-            # 5xx/timeout/stream break — the meter may still settle, and a
-            # released-then-settled reservation poisons the proxy outbox.
-            message = str(exc)
-            pre_send = isinstance(exc, (TypeError, ValueError)) or "EHBP" in message or "entitlement" in message
-            rejected = "failed with HTTP 4" in message
-            if pre_send or rejected:
+            # never ran at the enclave: dispatch never began (attestation,
+            # EHBP, TLS-pin, or local payload failure), or the gate rejected
+            # it with a 4xx before any generation, so no meter event will
+            # arrive. Billing independently refuses the release once the
+            # proxy has marked the reservation started, so a misclassified
+            # release cannot turn a completed inference into a free one.
+            # Everything else — 5xx, timeout, stream break, receipt failure —
+            # is outcome-unknown: the proxy's terminal meter settles the
+            # reservation, and the caller must not blindly retry.
+            if not session.dispatched:
                 self.release_reservation(api_key, entitlement)
-            raise
+                raise
+            if isinstance(exc, UpstreamHTTPError):
+                rejected = UpstreamRejected(str(exc))
+                rejected.status_code = exc.status
+                if exc.status < 500:
+                    self.release_reservation(api_key, entitlement)
+                raise rejected from exc
+            raise OutcomeUnknownError(
+                "Confidential request outcome unknown: the request reached the enclave and may "
+                "still complete; its reservation settles automatically. Do not retry blindly — "
+                "a retry runs a second, separately billed generation. "
+                f"Original error: {exc}"
+            ) from exc
 
     def release_reservation(self, api_key: str, entitlement: str) -> None:
         """Best-effort release of the billing reservation behind a minted

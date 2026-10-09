@@ -4,8 +4,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from adverserial import UpstreamHTTPError
 from adverserial_gateway.config import Config
-from adverserial_gateway.core import ClientRequestError, Dispatcher, canonical_model_id
+from adverserial_gateway.core import (
+    ClientRequestError,
+    Dispatcher,
+    OutcomeUnknownError,
+    UpstreamRejected,
+    canonical_model_id,
+)
 
 
 class CoreTests(unittest.TestCase):
@@ -67,6 +74,53 @@ class CoreTests(unittest.TestCase):
             result = self.dispatcher.completion("sk-" + "x" * 24, payload)
         self.assertIs(result, stream)
         self.assertTrue(session.return_value.chat_completions.call_args.kwargs["stream"])
+
+    def _completion_failure(self, exc, dispatched):
+        payload = {"model": "lordx64/cyberglm", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 12}
+        with patch.object(self.dispatcher, "proof_for", return_value=object()), patch.object(
+            self.dispatcher, "entitlement", return_value="signed-entitlement"
+        ), patch.object(self.dispatcher, "release_reservation") as release, patch(
+            "adverserial_gateway.core.VerifiedSession"
+        ) as session:
+            session.return_value.dispatched = dispatched
+            session.return_value.chat_completions.side_effect = exc
+            with self.assertRaises(Exception) as raised:
+                self.dispatcher.completion("sk-" + "x" * 24, payload)
+        return raised.exception, release
+
+    def test_pre_dispatch_failure_releases_the_reservation(self):
+        exc, release = self._completion_failure(ValueError("bad payload"), dispatched=False)
+        self.assertIsInstance(exc, ValueError)
+        release.assert_called_once()
+
+    def test_gate_4xx_releases_and_surfaces_the_upstream_status(self):
+        exc, release = self._completion_failure(UpstreamHTTPError(429, "queue full"), dispatched=True)
+        self.assertIsInstance(exc, UpstreamRejected)
+        self.assertEqual(exc.status_code, 429)
+        release.assert_called_once()
+
+    def test_upstream_5xx_never_releases_the_reservation(self):
+        exc, release = self._completion_failure(UpstreamHTTPError(500, "generation failed"), dispatched=True)
+        self.assertIsInstance(exc, UpstreamRejected)
+        self.assertEqual(exc.status_code, 500)
+        release.assert_not_called()
+
+    def test_post_dispatch_timeout_is_outcome_unknown_and_never_released(self):
+        exc, release = self._completion_failure(TimeoutError("timed out"), dispatched=True)
+        self.assertIsInstance(exc, OutcomeUnknownError)
+        self.assertEqual(exc.status_code, 502)
+        release.assert_not_called()
+
+    def test_successful_completion_never_releases(self):
+        payload = {"model": "lordx64/cyberglm", "messages": [{"role": "user", "content": "hello"}], "max_tokens": 12}
+        with patch.object(self.dispatcher, "proof_for", return_value=object()), patch.object(
+            self.dispatcher, "entitlement", return_value="signed-entitlement"
+        ), patch.object(self.dispatcher, "release_reservation") as release, patch(
+            "adverserial_gateway.core.VerifiedSession"
+        ) as session:
+            session.return_value.chat_completions.return_value = {"id": "ok"}
+            self.dispatcher.completion("sk-" + "x" * 24, payload)
+        release.assert_not_called()
 
 
 if __name__ == "__main__":
