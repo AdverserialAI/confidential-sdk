@@ -26,8 +26,10 @@ pi --extension /absolute/path/to/confidential-sdk/plugins/pi/adverserial-confide
   --model adverserial-confidential/lordx64/cyberglm
 ```
 
-`adverserial-verify` must be available on `PATH`; set
-`ADVERSERIAL_VERIFY_COMMAND` to an absolute executable path when it is not.
+The extension runs its checked-in verifier bundle with Node by default. To
+use another verifier executable, set `ADVERSERIAL_VERIFY_COMMAND` to an
+**absolute** executable path. Relative commands and `PATH` lookup are
+intentionally rejected so a project checkout cannot replace the verifier.
 The extension never stores or forwards the API key itself. Pi sends it only to
 `127.0.0.1`; the gateway exchanges it with billing for a one-use entitlement.
 

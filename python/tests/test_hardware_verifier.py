@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_pri
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from adverserial._jws import b64url_encode
-from adverserial.hardware_verifier import EvidenceError, protocol_bindings, verify
+from adverserial.hardware_verifier import EvidenceError, _command, protocol_bindings, verify
 
 
 def fingerprint(raw: bytes) -> str:
@@ -34,6 +34,21 @@ def evidence_request():
 
 
 class HardwareVerifierTests(unittest.TestCase):
+    def test_vendor_adapter_command_must_be_a_resolved_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            adapter = root / "adapter.py"
+            adapter.write_text("#!/bin/sh\nexit 0\n")
+            adapter.chmod(adapter.stat().st_mode | stat.S_IXUSR)
+            with patch.dict(os.environ, {"ADVERSERIAL_TDX_VERIFIER_COMMAND": str(adapter)}, clear=False):
+                self.assertEqual(_command("ADVERSERIAL_TDX_VERIFIER_COMMAND"), str(adapter.resolve()))
+            with patch.dict(os.environ, {"ADVERSERIAL_TDX_VERIFIER_COMMAND": "adapter.py"}, clear=False):
+                with self.assertRaisesRegex(EvidenceError, "absolute"):
+                    _command("ADVERSERIAL_TDX_VERIFIER_COMMAND")
+            with patch.dict(os.environ, {"ADVERSERIAL_TDX_VERIFIER_COMMAND": directory}, clear=False):
+                with self.assertRaisesRegex(EvidenceError, "executable file"):
+                    _command("ADVERSERIAL_TDX_VERIFIER_COMMAND")
+
     def test_protocol_bindings_rejects_dev_and_tampered_tls(self):
         request = evidence_request()
         request["evidence"]["dev"] = True

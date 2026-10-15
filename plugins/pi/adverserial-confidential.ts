@@ -8,20 +8,55 @@
  * inference receipt before completing a request.
  */
 import { spawn } from 'node:child_process';
+import { accessSync, constants, realpathSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Type } from '@earendil-works/pi-ai';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 const gatewayURL = () => process.env.ADVERSERIAL_GATEWAY_URL?.trim() || 'http://127.0.0.1:8787/v1';
 const modelID = () => process.env.ADVERSERIAL_MODEL?.trim() || 'lordx64/cyberglm';
-const verifier = () => process.env.ADVERSERIAL_VERIFY_COMMAND?.trim() || 'adverserial-verify';
+const bundledVerifier = fileURLToPath(new URL('../adverserial-verify/bin/adverserial-verify.mjs', import.meta.url));
+
+type VerifierInvocation = { command: string; args: string[] } | { error: string };
+
+const verifier = (): VerifierInvocation => {
+	const configured = process.env.ADVERSERIAL_VERIFY_COMMAND?.trim();
+	if (configured) {
+		if (!isAbsolute(configured)) {
+			return { error: 'ADVERSERIAL_VERIFY_COMMAND must be an absolute executable path; PATH lookup is disabled for attestation verification.' };
+		}
+		try {
+			const command = realpathSync(configured);
+			if (!statSync(command).isFile()) throw new Error('not a file');
+			accessSync(command, constants.X_OK);
+			return { command, args: [] };
+		} catch {
+			return { error: 'ADVERSERIAL_VERIFY_COMMAND must name an executable file.' };
+		}
+	}
+	try {
+		const script = realpathSync(bundledVerifier);
+		if (!statSync(script).isFile()) throw new Error('not a file');
+		accessSync(script, constants.R_OK);
+		return { command: process.execPath, args: [script] };
+	} catch {
+		return { error: 'The bundled adverserial-verify script is missing or unreadable. Reinstall the confidential SDK extension.' };
+	}
+};
 
 const runVerifier = (args: string[] = []): Promise<{ ok: boolean; output: string }> =>
 	new Promise((resolve) => {
-		const child = spawn(verifier(), args, { shell: false, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+		const invocation = verifier();
+		if ('error' in invocation) {
+			resolve({ ok: false, output: invocation.error });
+			return;
+		}
+		const child = spawn(invocation.command, [...invocation.args, ...args], { shell: false, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 		let output = '';
 		child.stdout.on('data', (chunk: Buffer) => { output += chunk.toString('utf8'); });
 		child.stderr.on('data', (chunk: Buffer) => { output += chunk.toString('utf8'); });
-		child.once('error', (error) => resolve({ ok: false, output: `Could not start ${verifier()}: ${error.message}` }));
+		child.once('error', (error) => resolve({ ok: false, output: `Could not start the attestation verifier: ${error.message}` }));
 		child.once('close', (code) => resolve({ ok: code === 0, output: output.trim() || `Verifier exited ${code ?? 'by signal'}.` }));
 	});
 

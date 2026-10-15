@@ -93,9 +93,16 @@ def protocol_bindings(request: Mapping[str, Any]) -> dict[str, Any]:
 
 def _command(env_name: str) -> str:
     command = os.environ.get(env_name, "").strip()
-    if not command or not Path(command).is_absolute():
+    candidate = Path(command)
+    if not command or not candidate.is_absolute():
         raise EvidenceError(f"{env_name} must be an absolute adapter executable path")
-    return command
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise EvidenceError(f"{env_name} could not be resolved") from exc
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise EvidenceError(f"{env_name} must name an executable file")
+    return str(resolved)
 
 
 def _run_adapter(env_name: str, payload: Mapping[str, Any]) -> dict[str, Any]:

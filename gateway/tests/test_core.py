@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import unittest
 import urllib.request
@@ -23,7 +24,7 @@ class CoreTests(unittest.TestCase):
         keys.write_text(json.dumps({"kid": {"kty": "EC"}}))
         self.cfg = Config.from_env({
             "ADVERSERIAL_RECEIPT_KEYS_FILE": str(keys),
-            "ADVERSERIAL_HARDWARE_VERIFIER_COMMAND": "/bin/true",
+            "ADVERSERIAL_HARDWARE_VERIFIER_COMMAND": sys.executable,
         })
         self.dispatcher = Dispatcher(self.cfg)
 
@@ -36,8 +37,9 @@ class CoreTests(unittest.TestCase):
 
     def test_billing_requests_ignore_shell_proxies_and_redirects(self):
         handlers = self.dispatcher._billing_opener.handlers
-        proxy = next(handler for handler in handlers if isinstance(handler, urllib.request.ProxyHandler))
-        self.assertEqual(proxy.proxies, {})
+        # build_opener drops an empty ProxyHandler from the final handler chain;
+        # its absence means it cannot consult environment proxy variables.
+        self.assertFalse(any(isinstance(handler, urllib.request.ProxyHandler) for handler in handlers))
         redirect = next(handler for handler in handlers if type(handler).__name__ == "_NoBillingRedirect")
         request = urllib.request.Request("https://billing.example/cc/entitlements")
         self.assertIsNone(redirect.redirect_request(request, None, 302, "Found", {}, "https://other.example/"))
