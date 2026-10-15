@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +33,14 @@ class CoreTests(unittest.TestCase):
     def test_unknown_models_cannot_reach_the_entitlement_exchange(self):
         with self.assertRaises(ClientRequestError):
             self.dispatcher.completion("sk-" + "x" * 24, {"model": "gpt-5", "messages": []})
+
+    def test_billing_requests_ignore_shell_proxies_and_redirects(self):
+        handlers = self.dispatcher._billing_opener.handlers
+        proxy = next(handler for handler in handlers if isinstance(handler, urllib.request.ProxyHandler))
+        self.assertEqual(proxy.proxies, {})
+        redirect = next(handler for handler in handlers if type(handler).__name__ == "_NoBillingRedirect")
+        request = urllib.request.Request("https://billing.example/cc/entitlements")
+        self.assertIsNone(redirect.redirect_request(request, None, 302, "Found", {}, "https://other.example/"))
 
     def test_claude_child_model_aliases_resolve_to_canonical_cyberglm(self):
         self.assertEqual(canonical_model_id("claude-haiku-4-5-20251001"), "lordx64/cyberglm")

@@ -37,6 +37,28 @@ def _positive_int(name: str, value: str, maximum: int) -> int:
     return parsed
 
 
+def _hardware_verifier_command(value: str) -> str:
+    """Return a fixed executable path for the independent verifier.
+
+    Verification must never fall back to PATH lookup.  A checkout, project
+    hook, or other untrusted working directory can otherwise shadow a command
+    such as ``adverserial-hardware-verify`` and forge a local "verified"
+    verdict before any prompt is encrypted.  The documented configuration is
+    already an absolute executable path; resolve it once at startup and pass
+    that path directly to subprocess without a shell.
+    """
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        raise ConfigError("ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must be an absolute executable path")
+    try:
+        command = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise ConfigError("ADVERSERIAL_HARDWARE_VERIFIER_COMMAND could not be resolved") from exc
+    if not command.is_file() or not os.access(command, os.X_OK):
+        raise ConfigError("ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must name an executable file")
+    return str(command)
+
+
 @dataclass(frozen=True)
 class Config:
     listen_host: str
@@ -77,7 +99,7 @@ class Config:
             issuer=env.get("ADVERSERIAL_ISSUER", "https://verify.adverserial.ai"),
             audience=env.get("ADVERSERIAL_AUDIENCE", "https://chat.adverserial.ai"),
             receipt_keys=data,
-            hardware_verifier_command=command,
+            hardware_verifier_command=_hardware_verifier_command(command),
             max_input_tokens=_positive_int("ADVERSERIAL_MAX_INPUT_TOKENS", env.get("ADVERSERIAL_MAX_INPUT_TOKENS", "6291456"), 6291456),
             max_output_tokens=_positive_int("ADVERSERIAL_MAX_OUTPUT_TOKENS", env.get("ADVERSERIAL_MAX_OUTPUT_TOKENS", "65536"), 65536),
         )

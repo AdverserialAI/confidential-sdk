@@ -5031,8 +5031,8 @@ var require_base = __commonJS({
 var require_constants2 = __commonJS({
   "../../typescript/node_modules/asn1.js/lib/asn1/constants/index.js"(exports) {
     "use strict";
-    var constants = exports;
-    constants._reverse = function reverse(map) {
+    var constants2 = exports;
+    constants2._reverse = function reverse(map) {
       const res = {};
       Object.keys(map).forEach(function(key) {
         if ((key | 0) == key)
@@ -5042,7 +5042,7 @@ var require_constants2 = __commonJS({
       });
       return res;
     };
-    constants.der = require_der();
+    constants2.der = require_der();
   }
 });
 
@@ -30130,7 +30130,7 @@ var require_src = __commonJS({
     var { verify, QuoteVerifier, VerifiedReport } = require_verify();
     var { getCollateral, getCollateralFromPcs, getCollateralAndVerify: getCollateralAndVerify2, PHALA_PCCS_URL, INTEL_PCS_URL } = require_collateral();
     var { TcbInfo } = require_tcb_info();
-    var constants = require_constants();
+    var constants2 = require_constants();
     var oids = require_oids();
     var utils = require_utils5();
     var intel = require_intel();
@@ -30155,7 +30155,7 @@ var require_src = __commonJS({
       // Utilities
       utils,
       intel,
-      constants,
+      constants: constants2,
       oids
     };
   }
@@ -30167,7 +30167,8 @@ import os from "node:os";
 import path from "node:path";
 
 // ../shared/src/config.ts
-import { readFileSync } from "node:fs";
+import { accessSync, constants, readFileSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute } from "node:path";
 var DEFAULT_BASE_URL = "https://api.adverserial.ai/v1";
 var DEFAULT_MODEL_ID = "lordx64/cyberglm";
 var DEFAULT_ISSUER = "https://verify.adverserial.ai";
@@ -30186,6 +30187,21 @@ var isLoopbackURL = (raw) => {
     return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
   } catch {
     return false;
+  }
+};
+var resolveHardwareVerifierCommand = (raw) => {
+  const command = raw?.trim();
+  if (!command) return null;
+  if (!isAbsolute(command)) {
+    throw new ConfigError("ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must be an absolute executable path.");
+  }
+  try {
+    const resolved = realpathSync(command);
+    if (!statSync(resolved).isFile()) throw new Error("not a file");
+    accessSync(resolved, constants.X_OK);
+    return resolved;
+  } catch {
+    throw new ConfigError("ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must name an executable file.");
   }
 };
 var validateJwk = (kid, jwk, source) => {
@@ -30259,7 +30275,7 @@ var resolveConfig = (env, options) => {
     keysSource,
     trustEvidenceKey: envFlag(env.ADVERSERIAL_TRUST_EVIDENCE_KEY) || options?.trustEvidenceKey === true,
     loopback: isLoopbackURL(baseURL),
-    hardwareVerifierCommand: env.ADVERSERIAL_HARDWARE_VERIFIER_COMMAND?.trim() || null
+    hardwareVerifierCommand: resolveHardwareVerifierCommand(env.ADVERSERIAL_HARDWARE_VERIFIER_COMMAND)
   };
 };
 var maybeRelaxLoopbackTofuTls = (config) => {

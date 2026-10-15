@@ -48,6 +48,26 @@ class OutcomeUnknownError(GatewayError):
     status_code = 502
 
 
+class _NoBillingRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects from the fixed billing origin.
+
+    An entitlement request carries the customer's API key.  A redirect (or an
+    HTTPS proxy inherited from a project shell) would turn the fixed billing
+    URL into an attacker-controlled hop.  The gateway has no need for either,
+    so it sends those requests directly and fails closed instead.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+        return None
+
+
+def _direct_billing_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoBillingRedirect(),
+    )
+
+
 def canonical_model_id(model: str) -> str:
     """Return the runtime model used for a locally supported client model.
 
@@ -82,6 +102,7 @@ class Dispatcher:
     def __init__(self, config: Config):
         self.config = config
         self._proofs: dict[str, ProofCache] = {model: ProofCache() for model in CANONICAL_MODELS}
+        self._billing_opener = _direct_billing_opener()
 
     def proof_for(self, model: str) -> VerifiedProof:
         model = canonical_model_id(model)
@@ -124,7 +145,7 @@ class Dispatcher:
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=15) as response:
+            with self._billing_opener.open(request, timeout=15) as response:
                 body = response.read(64 * 1024)
         except urllib.error.HTTPError as exc:
             detail = exc.read(1024).decode("utf-8", "replace")
@@ -218,7 +239,7 @@ class Dispatcher:
                 method="POST",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(request, timeout=10):
+            with self._billing_opener.open(request, timeout=10):
                 pass
         except Exception:
             pass

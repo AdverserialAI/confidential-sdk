@@ -11,7 +11,8 @@
  * receipt keys published at https://verify.adverserial.ai.
  */
 
-import { readFileSync } from 'node:fs';
+import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import type { TrustedReceiptKeys } from '../../../typescript/src/index.js';
 
 export const DEFAULT_BASE_URL = 'https://api.adverserial.ai/v1';
@@ -63,6 +64,28 @@ const isLoopbackURL = (raw: string): boolean => {
 		return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
 	} catch {
 		return false;
+	}
+};
+
+/**
+ * Resolve the independently maintained hardware verifier once, without a
+ * PATH search. A project-controlled PATH entry must never be able to replace
+ * the verifier and make a plugin report a fabricated local TEE verdict.
+ * Documentation already requires an absolute executable path.
+ */
+const resolveHardwareVerifierCommand = (raw: string | undefined): string | null => {
+	const command = raw?.trim();
+	if (!command) return null;
+	if (!isAbsolute(command)) {
+		throw new ConfigError('ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must be an absolute executable path.');
+	}
+	try {
+		const resolved = realpathSync(command);
+		if (!statSync(resolved).isFile()) throw new Error('not a file');
+		accessSync(resolved, constants.X_OK);
+		return resolved;
+	} catch {
+		throw new ConfigError('ADVERSERIAL_HARDWARE_VERIFIER_COMMAND must name an executable file.');
 	}
 };
 
@@ -157,7 +180,7 @@ export const resolveConfig = (env: CoreEnv, options?: ResolveConfigOptions): Cor
 		keysSource,
 		trustEvidenceKey: envFlag(env.ADVERSERIAL_TRUST_EVIDENCE_KEY) || options?.trustEvidenceKey === true,
 		loopback: isLoopbackURL(baseURL),
-		hardwareVerifierCommand: env.ADVERSERIAL_HARDWARE_VERIFIER_COMMAND?.trim() || null
+		hardwareVerifierCommand: resolveHardwareVerifierCommand(env.ADVERSERIAL_HARDWARE_VERIFIER_COMMAND)
 	};
 };
 
