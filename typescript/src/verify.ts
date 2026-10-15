@@ -53,7 +53,7 @@ export type VerifyEndpointOptions = {
 	issuer: string;
 	/** Expected receipt claim `aud` (string or array membership). */
 	audience: string;
-	/** Expected receipt claim `endpoint`; checked only when provided. */
+	/** Expected receipt claim `endpoint`; defaults to the HTTPS origin of `baseURL`. */
 	expectedEndpoint?: string;
 	/** Expected receipt claim `model_digest`; checked only when provided. */
 	expectedModelDigest?: string;
@@ -192,6 +192,21 @@ const hasAudience = (audienceClaim: unknown, expected: string): boolean =>
 		? audienceClaim === expected
 		: Array.isArray(audienceClaim) && audienceClaim.includes(expected);
 
+const endpointURL = (raw: string, label: string): URL => {
+	const parsed = new URL(raw);
+	if (
+		parsed.protocol !== 'https:' ||
+		!parsed.hostname ||
+		parsed.username ||
+		parsed.password ||
+		parsed.search ||
+		parsed.hash
+	) {
+		throw new Error(`${label} must be a plain https URL without credentials, query, or fragment.`);
+	}
+	return parsed;
+};
+
 /**
  * Verify the attestation of the endpoint behind `baseURL` (e.g.
  * "https://host/v1"). Never rejects: failures return { status: 'failed' }.
@@ -201,10 +216,18 @@ export const verifyEndpoint = async (
 	options: VerifyEndpointOptions
 ): Promise<VerificationResult> => {
 	try {
+		const endpoint = endpointURL(baseURL, 'baseURL');
+		const expectedEndpoint = options.expectedEndpoint ?? endpoint.origin;
+		if (expectedEndpoint !== endpoint.origin) {
+			throw new Error('expected endpoint must equal the origin of baseURL.');
+		}
 		const fetchImpl = options.fetchImpl ?? fetch;
 		const nowMs = options.now?.() ?? Date.now();
 		const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-		const attestationUrl = new URL(options.attestationUrl ?? '/attestation', baseURL);
+		const attestationUrl = new URL(options.attestationUrl ?? '/attestation', endpoint);
+		if (attestationUrl.protocol !== 'https:' || attestationUrl.origin !== endpoint.origin) {
+			throw new Error('attestationUrl must remain on the configured HTTPS endpoint origin.');
+		}
 		attestationUrl.searchParams.set('nonce', nonce);
 
 		// This request deliberately carries only a fresh nonce. It never sends a
@@ -244,7 +267,7 @@ export const verifyEndpoint = async (
 		if (asNonEmptyString(claims.model_id) !== options.expectedModelId) {
 			throw new Error('The receipt model does not match the selected model.');
 		}
-		if (options.expectedEndpoint && asNonEmptyString(claims.endpoint) !== options.expectedEndpoint) {
+		if (asNonEmptyString(claims.endpoint) !== expectedEndpoint) {
 			throw new Error('The receipt is not bound to the configured inference endpoint.');
 		}
 		if (
@@ -285,7 +308,7 @@ export const verifyEndpoint = async (
 			evidence,
 			nonce,
 			expectedModelId: options.expectedModelId,
-			expectedEndpoint: options.expectedEndpoint
+			expectedEndpoint
 		});
 		if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
 			throw new Error('The hardware verifier did not accept the attestation evidence.');

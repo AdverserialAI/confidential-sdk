@@ -41,6 +41,7 @@ const { verifyEndpoint, createVerifiedOpenAI, canonicalize, evidenceDigest } = a
 const MODEL = 'lordx64/cyberglm';
 const ISSUER = 'https://verify.adverserial.ai';
 const AUDIENCE = 'https://chat.adverserial.ai';
+const TEST_ENTITLEMENT = 'eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJ0ZXN0In0.signature';
 
 const freePort = () =>
 	new Promise((resolve, reject) => {
@@ -184,7 +185,7 @@ try {
 	// 7. createVerifiedOpenAI: verified wrapper issues authorized requests.
 	const verifiedClient = await createVerifiedOpenAI({
 		baseURL: `${base}/v1`,
-		entitlement: 'test-entitlement',
+		entitlement: TEST_ENTITLEMENT,
 		...verifyOptions
 	});
 	assert.equal(verifiedClient.verified, true);
@@ -201,14 +202,28 @@ try {
 		...verifyOptions
 	});
 	assert.equal(proofClient.verified, true);
-	const entitledHealth = await proofClient.fetchWithEntitlement('test-entitlement')(`${base}/healthz`);
+	const entitledHealth = await proofClient.fetchWithEntitlement(TEST_ENTITLEMENT)(`${base}/healthz`);
 	assert.equal(entitledHealth.status, 200);
 	console.log('✓ entitlement binds to existing verified proof');
 
-	// 9. createVerifiedOpenAI: failed verification => fetchImpl refuses.
+	// 9. Wrapper credentials stay on the exact attested origin and reject
+	// accidental platform-key input before any request is sent.
+	await assert.rejects(
+		verifiedClient.fetchImpl('https://example.invalid/v1/chat/completions'),
+		/verified endpoint origin/
+	);
+	const wrongCredential = await createVerifiedOpenAI({
+		baseURL: `${base}/v1`,
+		entitlement: 'sk-long-lived-platform-key',
+		...verifyOptions
+	});
+	await assert.rejects(wrongCredential.fetchImpl(`${base}/healthz`), /compact, short-lived confidential entitlement/);
+	console.log('✓ wrapper rejects cross-origin dispatch and non-entitlement credentials');
+
+	// 10. createVerifiedOpenAI: failed verification => fetchImpl refuses.
 	const brokenClient = await createVerifiedOpenAI({
 		baseURL: `${base}/v1`,
-		entitlement: 'test-entitlement',
+		entitlement: TEST_ENTITLEMENT,
 		...verifyOptions,
 		trustedReceiptKeys: {}
 	});

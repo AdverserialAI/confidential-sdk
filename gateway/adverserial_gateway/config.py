@@ -20,10 +20,19 @@ class ConfigError(ValueError):
     pass
 
 
-def _https_url(name: str, value: str) -> str:
+def _https_url(name: str, value: str, *, origin_only: bool = False) -> str:
     parsed = urlsplit(value)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise ConfigError(f"{name} must be an https URL")
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ConfigError(f"{name} must be a plain https URL without credentials, query, or fragment")
+    if origin_only and parsed.path not in {"", "/"}:
+        raise ConfigError(f"{name} must be an https origin without a path")
     return value.rstrip("/")
 
 
@@ -95,7 +104,11 @@ class Config:
             listen_host=host,
             listen_port=port,
             cc_api_url=_https_url("ADVERSERIAL_CC_API_URL", env.get("ADVERSERIAL_CC_API_URL", "https://api.adverserial.ai/v1")),
-            billing_url=_https_url("ADVERSERIAL_BILLING_URL", env.get("ADVERSERIAL_BILLING_URL", "https://billing.adverserial.ai")),
+            billing_url=_https_url(
+                "ADVERSERIAL_BILLING_URL",
+                env.get("ADVERSERIAL_BILLING_URL", "https://billing.adverserial.ai"),
+                origin_only=True,
+            ),
             issuer=env.get("ADVERSERIAL_ISSUER", "https://verify.adverserial.ai"),
             audience=env.get("ADVERSERIAL_AUDIENCE", "https://chat.adverserial.ai"),
             receipt_keys=data,

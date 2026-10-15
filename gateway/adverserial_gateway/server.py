@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
+import socket
+import threading
+import time
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,6 +18,111 @@ from .compat import anthropic_to_chat, chat_to_anthropic, chat_to_response, resp
 from .core import AuthorizationError, ClientRequestError, Dispatcher, GatewayError
 
 
+MAX_LOCAL_REQUEST_BYTES = 8 * 1024 * 1024
+MAX_LOCAL_CONNECTIONS = 16
+LOCAL_CONNECTION_TIMEOUT_SECONDS = 20.0
+LOCAL_BODY_DEADLINE_SECONDS = 30.0
+
+
+class RequestBodyTimeout(ClientRequestError):
+    """The client did not finish its declared body within the local deadline."""
+
+    status_code = HTTPStatus.REQUEST_TIMEOUT
+
+
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    """A loopback HTTP server with bounded connection work.
+
+    A local gateway is intentionally useful to developer tools, including
+    tools that may execute repository-controlled code.  Binding to loopback
+    does not make an unbounded HTTP parser safe: a local process could
+    otherwise hold an arbitrary number of handler threads in incomplete
+    headers or bodies and prevent the customer's actual client from using the
+    gateway.  Keep the small public surface responsive by bounding active
+    connections and timing out each connection, while allowing normal
+    inference streams to keep their handler for their lifetime.
+    """
+
+    daemon_threads = True
+    block_on_close = False
+    request_queue_size = MAX_LOCAL_CONNECTIONS
+
+    def __init__(
+        self,
+        server_address,
+        request_handler_class,
+        *,
+        max_connections: int = MAX_LOCAL_CONNECTIONS,
+        connection_timeout: float = LOCAL_CONNECTION_TIMEOUT_SECONDS,
+        body_deadline: float = LOCAL_BODY_DEADLINE_SECONDS,
+    ):
+        if max_connections < 1:
+            raise ValueError("max_connections must be positive")
+        if connection_timeout <= 0 or body_deadline <= 0:
+            raise ValueError("gateway timeouts must be positive")
+        super().__init__(server_address, request_handler_class)
+        self.connection_timeout = connection_timeout
+        self.body_deadline = body_deadline
+        self._connection_slots = threading.BoundedSemaphore(max_connections)
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.settimeout(self.connection_timeout)
+        return request, client_address
+
+    def verify_request(self, request, client_address):
+        """Defend in depth if a hostname unexpectedly resolves off-loopback."""
+        try:
+            return ipaddress.ip_address(client_address[0]).is_loopback
+        except ValueError:
+            return False
+
+    def process_request(self, request, client_address):
+        if not self._connection_slots.acquire(blocking=False):
+            # Do not block the accept loop trying to write an error to a
+            # peer that has stopped reading.  The close is sufficient for
+            # clients that did not complete a request yet.
+            try:
+                # Drain only data already queued by a well-behaved local
+                # client.  On some TCP stacks, closing with a complete small
+                # request still unread converts a just-written 503 into a
+                # reset.  A bounded, nonblocking drain preserves a useful
+                # retry signal without letting an attacker consume work.
+                request.setblocking(False)
+                remaining = 8 * 1024
+                while remaining:
+                    try:
+                        data = request.recv(min(remaining, 1024))
+                    except (BlockingIOError, OSError):
+                        break
+                    if not data:
+                        break
+                    remaining -= len(data)
+                request.settimeout(0.25)
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\r\n"
+                    b"Connection: close\r\n"
+                    b"Cache-Control: no-store\r\n"
+                    b"Content-Length: 0\r\n\r\n"
+                )
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connection_slots.release()
+
+
 class Handler(BaseHTTPRequestHandler):
     dispatcher: Dispatcher
     server_version = "AdverserialConfidentialGateway/0.1"
@@ -23,14 +132,61 @@ class Handler(BaseHTTPRequestHandler):
         # Do not log request paths, headers, bodies, identities, or prompts.
         return
 
-    def _json(self, status: int, payload: dict):
+    def _json(self, status: int, payload: dict, *, close: bool = False):
         data = json.dumps(payload, separators=(",", ":")).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        if close:
+            # A rejected request may still have unread body bytes.  Never let
+            # those bytes be interpreted as a following keep-alive request.
+            self.close_connection = True
+            self.send_header("Connection", "close")
         self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            # A caller that timed out or disconnected is not a server error,
+            # and request/error logs must not contain customer content.
+            pass
+
+    def _request_size(self) -> int:
+        if self.headers.get("transfer-encoding"):
+            raise ClientRequestError("Chunked request bodies are not supported by the local gateway")
+        values = self.headers.get_all("content-length") or []
+        if len(values) != 1:
+            raise ClientRequestError("Exactly one Content-Length header is required")
+        value = values[0].strip()
+        if not value.isascii() or not value.isdecimal():
+            raise ClientRequestError("Content-Length must be a positive decimal integer")
+        size = int(value)
+        if not 1 <= size <= MAX_LOCAL_REQUEST_BYTES:
+            raise ClientRequestError(f"Request body must be between 1 and {MAX_LOCAL_REQUEST_BYTES} bytes")
+        return size
+
+    def _read_body(self, size: int) -> bytes:
+        deadline = time.monotonic() + self.server.body_deadline
+        chunks: list[bytes] = []
+        remaining = size
+        while remaining:
+            timeout = deadline - time.monotonic()
+            if timeout <= 0:
+                raise RequestBodyTimeout("Request body upload timed out")
+            try:
+                # Socket timeouts alone are insufficient: a peer can send a
+                # byte before each idle timeout forever.  Bound total upload
+                # time as well as each blocking read.
+                self.connection.settimeout(min(self.server.connection_timeout, timeout))
+                chunk = self.rfile.read(min(64 * 1024, remaining))
+            except (socket.timeout, TimeoutError, OSError) as exc:
+                raise RequestBodyTimeout("Request body upload timed out") from exc
+            if not chunk:
+                raise ClientRequestError("Request body ended before Content-Length")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        self.connection.settimeout(self.server.connection_timeout)
+        return b"".join(chunks)
 
     def _sse_start(self):
         self.send_response(HTTPStatus.OK)
@@ -239,18 +395,18 @@ class Handler(BaseHTTPRequestHandler):
         log = getattr(self.server, "logger", None) or (lambda *a: print(*a, flush=True))
         log(f"[gateway] POST {path}")
         if path not in {"/v1/chat/completions", "/v1/messages", "/v1/responses", "/responses"}:
-            return self._json(HTTPStatus.NOT_FOUND, {"error": {"message": "Unsupported local gateway endpoint"}})
-        length = self.headers.get("content-length")
+            return self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": {"message": "Unsupported local gateway endpoint"}},
+                close=True,
+            )
         try:
-            size = int(length or "0")
-        except ValueError:
-            size = 0
-        if size < 1 or size > 64 * 1024 * 1024:
-            return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": {"message": "Invalid request size"}})
-        auth = self.headers.get("authorization", "")
-        api_key = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else self.headers.get("x-api-key", "").strip()
-        try:
-            payload = json.loads(self.rfile.read(size))
+            if not is_json_content_type(self.headers.get("content-type", "")):
+                raise ClientRequestError("Content-Type must be application/json")
+            size = self._request_size()
+            auth = self.headers.get("authorization", "")
+            api_key = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else self.headers.get("x-api-key", "").strip()
+            payload = json.loads(self._read_body(size))
             if not isinstance(payload, dict):
                 raise ClientRequestError("Request must be a JSON object")
             streaming = bool(payload.get("stream"))
@@ -276,10 +432,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, dict(result))
         except GatewayError as exc:
             log(f"[gateway] POST {path} -> {exc.status_code} {exc}")
-            self._json(exc.status_code, {"error": {"type": "confidential_gateway_error", "message": str(exc)}})
-        except (ValueError, TypeError) as exc:
+            self._json(exc.status_code, {"error": {"type": "confidential_gateway_error", "message": str(exc)}}, close=True)
+        except (ValueError, TypeError, RecursionError) as exc:
             log(f"[gateway] POST {path} -> 400 {exc}")
-            self._json(HTTPStatus.BAD_REQUEST, {"error": {"message": str(exc)}})
+            self._json(HTTPStatus.BAD_REQUEST, {"error": {"message": str(exc)}}, close=True)
+
+
+def is_json_content_type(value: str) -> bool:
+    return value.split(";", 1)[0].strip().lower() == "application/json"
 
 
 def main() -> None:
@@ -290,6 +450,6 @@ def main() -> None:
     except ConfigError as exc:
         raise SystemExit(f"configuration error: {exc}")
     Handler.dispatcher = Dispatcher(config)
-    server = ThreadingHTTPServer((config.listen_host, config.listen_port), Handler)
+    server = BoundedThreadingHTTPServer((config.listen_host, config.listen_port), Handler)
     print(f"adverserial confidential gateway listening on http://{config.listen_host}:{config.listen_port}", flush=True)
     server.serve_forever()

@@ -32404,185 +32404,6 @@ ${pckCertChain}`;
 
   // node_modules/ehbp/dist/esm/client.js
   var MAX_PROBLEM_DETAILS_BYTES = 64 * 1024;
-  var Transport = class _Transport {
-    serverIdentity;
-    serverHost;
-    _lastSessionRecoveryToken;
-    requestGeneration = 0;
-    constructor(serverIdentity, serverHost) {
-      this.serverIdentity = serverIdentity;
-      this.serverHost = serverHost;
-    }
-    getSessionRecoveryToken() {
-      if (!this._lastSessionRecoveryToken) {
-        throw new Error("No session recovery token available \u2014 no request has been made yet");
-      }
-      return this._lastSessionRecoveryToken;
-    }
-    /**
-     * Create a new transport by fetching server public key.
-     * The optional init is applied to the key fetch (e.g. credentials).
-     */
-    static async create(serverURL, init) {
-      const url = new URL(serverURL);
-      const serverHost = url.host;
-      const keysURL = new URL(PROTOCOL.KEYS_PATH, serverURL);
-      const response = await fetch(keysURL.toString(), init);
-      if (!response.ok) {
-        throw new Error(`Failed to get server public key: ${response.status}`);
-      }
-      const contentType = response.headers.get("content-type");
-      if (contentType !== PROTOCOL.KEYS_MEDIA_TYPE) {
-        throw new Error(`Invalid content type: ${contentType}`);
-      }
-      const keysData = new Uint8Array(await response.arrayBuffer());
-      const serverIdentity = await Identity.unmarshalPublicConfig(keysData);
-      return new _Transport(serverIdentity, serverHost);
-    }
-    static isProblemJSONContentType(contentType) {
-      if (!contentType) {
-        return false;
-      }
-      const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-      return mediaType === PROTOCOL.PROBLEM_JSON_MEDIA_TYPE;
-    }
-    static async checkKeyConfigMismatch(response) {
-      if (response.status !== 422)
-        return;
-      if (!_Transport.isProblemJSONContentType(response.headers.get("content-type")))
-        return;
-      let problem;
-      try {
-        const clone = response.clone();
-        if (!clone.body)
-          return;
-        const reader = clone.body.getReader();
-        const chunks = [];
-        let length = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done)
-            break;
-          length += value.byteLength;
-          if (length > MAX_PROBLEM_DETAILS_BYTES) {
-            reader.cancel().catch(() => {
-            });
-            return;
-          }
-          chunks.push(value);
-        }
-        const body = new Uint8Array(length);
-        let offset = 0;
-        for (const chunk of chunks) {
-          body.set(chunk, offset);
-          offset += chunk.byteLength;
-        }
-        problem = JSON.parse(new TextDecoder().decode(body));
-      } catch {
-        return;
-      }
-      if (problem?.type === PROTOCOL.KEY_CONFIG_PROBLEM_TYPE) {
-        throw new KeyConfigMismatchError(typeof problem.title === "string" ? problem.title : void 0);
-      }
-    }
-    static async shouldDecryptResponse(response) {
-      if (response.headers.has(PROTOCOL.RESPONSE_NONCE_HEADER)) {
-        return true;
-      }
-      await _Transport.checkKeyConfigMismatch(response);
-      if (!response.ok) {
-        return false;
-      }
-      throw new ProtocolError(`Missing ${PROTOCOL.RESPONSE_NONCE_HEADER} header`);
-    }
-    /**
-     * Get the server identity
-     */
-    getServerIdentity() {
-      return this.serverIdentity;
-    }
-    /**
-     * Get the server public key
-     */
-    getServerPublicKey() {
-      return this.serverIdentity.getPublicKey();
-    }
-    /**
-     * Get the server public key as hex string
-     */
-    async getServerPublicKeyHex() {
-      return this.serverIdentity.getPublicKeyHex();
-    }
-    /**
-     * Make an encrypted HTTP request.
-     */
-    async request(input, init) {
-      const generation = ++this.requestGeneration;
-      this._lastSessionRecoveryToken = void 0;
-      const inputUrl = input instanceof Request ? input.url : String(input);
-      if (inputUrl.startsWith("data:") || inputUrl.startsWith("blob:")) {
-        return fetch(input, init);
-      }
-      const normalizedRequest = new Request(input, init);
-      const requestBodyBytes = await normalizedRequest.arrayBuffer();
-      const requestBody = requestBodyBytes.byteLength > 0 ? requestBodyBytes : null;
-      const url = new URL(normalizedRequest.url);
-      url.host = this.serverHost;
-      const request = new Request(url.toString(), {
-        ...forwardedRequestInit(normalizedRequest),
-        method: normalizedRequest.method,
-        headers: normalizedRequest.headers,
-        body: requestBody,
-        duplex: "half"
-      });
-      const { request: encryptedRequest, context } = await this.serverIdentity.encryptRequestWithContext(request);
-      const token = context ? await extractSessionRecoveryToken(context) : void 0;
-      const response = await fetch(encryptedRequest);
-      if (!token) {
-        return response;
-      }
-      const shouldDecrypt = await _Transport.shouldDecryptResponse(response);
-      if (!shouldDecrypt) {
-        return response;
-      }
-      let streamTerminated = false;
-      const clearToken = () => {
-        streamTerminated = true;
-        if (this.requestGeneration === generation) {
-          this._lastSessionRecoveryToken = void 0;
-        }
-      };
-      const decryptedResponse = await decryptResponseWithToken(response, token, clearToken, clearToken);
-      if (this.requestGeneration === generation) {
-        this._lastSessionRecoveryToken = streamTerminated ? void 0 : token;
-      }
-      return decryptedResponse;
-    }
-    /**
-     * Convenience method for GET requests
-     */
-    async get(url, init) {
-      return this.request(url, { ...init, method: "GET" });
-    }
-    /**
-     * Convenience method for POST requests
-     */
-    async post(url, body, init) {
-      return this.request(url, { ...init, method: "POST", body });
-    }
-    /**
-     * Convenience method for PUT requests
-     */
-    async put(url, body, init) {
-      return this.request(url, { ...init, method: "PUT", body });
-    }
-    /**
-     * Convenience method for DELETE requests
-     */
-    async delete(url, init) {
-      return this.request(url, { ...init, method: "DELETE" });
-    }
-  };
 
   // src/verify.ts
   var textDecoder = new TextDecoder();
@@ -32634,12 +32455,27 @@ ${pckCertChain}`;
     return value;
   };
   var hasAudience = (audienceClaim, expected) => typeof audienceClaim === "string" ? audienceClaim === expected : Array.isArray(audienceClaim) && audienceClaim.includes(expected);
+  var endpointURL = (raw, label) => {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new Error(`${label} must be a plain https URL without credentials, query, or fragment.`);
+    }
+    return parsed;
+  };
   var verifyEndpoint = async (baseURL, options) => {
     try {
+      const endpoint = endpointURL(baseURL, "baseURL");
+      const expectedEndpoint = options.expectedEndpoint ?? endpoint.origin;
+      if (expectedEndpoint !== endpoint.origin) {
+        throw new Error("expected endpoint must equal the origin of baseURL.");
+      }
       const fetchImpl = options.fetchImpl ?? fetch;
       const nowMs = options.now?.() ?? Date.now();
       const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-      const attestationUrl = new URL(options.attestationUrl ?? "/attestation", baseURL);
+      const attestationUrl = new URL(options.attestationUrl ?? "/attestation", endpoint);
+      if (attestationUrl.protocol !== "https:" || attestationUrl.origin !== endpoint.origin) {
+        throw new Error("attestationUrl must remain on the configured HTTPS endpoint origin.");
+      }
       attestationUrl.searchParams.set("nonce", nonce);
       const response = await fetchImpl(attestationUrl, {
         method: "GET",
@@ -32674,7 +32510,7 @@ ${pckCertChain}`;
       if (asNonEmptyString(claims.model_id) !== options.expectedModelId) {
         throw new Error("The receipt model does not match the selected model.");
       }
-      if (options.expectedEndpoint && asNonEmptyString(claims.endpoint) !== options.expectedEndpoint) {
+      if (asNonEmptyString(claims.endpoint) !== expectedEndpoint) {
         throw new Error("The receipt is not bound to the configured inference endpoint.");
       }
       if (options.expectedModelDigest && asNonEmptyString(claims.model_digest) !== options.expectedModelDigest) {
@@ -32701,7 +32537,7 @@ ${pckCertChain}`;
         evidence,
         nonce,
         expectedModelId: options.expectedModelId,
-        expectedEndpoint: options.expectedEndpoint
+        expectedEndpoint
       });
       if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
         throw new Error("The hardware verifier did not accept the attestation evidence.");
@@ -32792,38 +32628,89 @@ ${pckCertChain}`;
       this.name = "VerificationRequiredError";
     }
   };
+  var entitlementPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+  var MAX_EHBP_PROBLEM_BYTES = 64 * 1024;
+  var requireEntitlement = (value) => {
+    if (!value || value.length > 16384 || !entitlementPattern.test(value)) {
+      throw new VerificationRequiredError("a compact, short-lived confidential entitlement is required; refusing to forward another credential");
+    }
+    return value;
+  };
+  var proofOrigin = (proof) => {
+    if (!proof.endpoint) throw new VerificationRequiredError("the verified proof has no endpoint origin");
+    const endpoint = new URL(proof.endpoint);
+    if (endpoint.protocol !== "https:" || endpoint.origin !== proof.endpoint) {
+      throw new VerificationRequiredError("the verified proof has an invalid endpoint origin");
+    }
+    return endpoint.origin;
+  };
+  var sameVerifiedOrigin = (request, proof) => {
+    if (new URL(request.url).origin !== proofOrigin(proof)) {
+      throw new VerificationRequiredError("refusing to send an entitlement outside the verified endpoint origin");
+    }
+  };
+  var responseSignalsEHBPKeyMismatch = async (response) => {
+    if (response.status !== 422) return;
+    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+    if (contentType !== PROTOCOL.PROBLEM_JSON_MEDIA_TYPE || !response.body) return;
+    try {
+      const reader = response.clone().body?.getReader();
+      if (!reader) return;
+      const chunks = [];
+      let length = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        length += value.byteLength;
+        if (length > MAX_EHBP_PROBLEM_BYTES) {
+          await reader.cancel();
+          return;
+        }
+        chunks.push(value);
+      }
+      const body = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      const problem = JSON.parse(new TextDecoder().decode(body));
+      if (typeof problem === "object" && problem !== null && problem.type === PROTOCOL.KEY_CONFIG_PROBLEM_TYPE) {
+        const title = problem.title;
+        throw new KeyConfigMismatchError(typeof title === "string" ? title : void 0);
+      }
+    } catch (error) {
+      if (error instanceof KeyConfigMismatchError) throw error;
+    }
+  };
+  var mustDecryptEHBPResponse = async (response) => {
+    if (response.headers.has(PROTOCOL.RESPONSE_NONCE_HEADER)) return true;
+    await responseSignalsEHBPKeyMismatch(response);
+    if (!response.ok) return false;
+    throw new VerificationRequiredError("the confidential endpoint returned a successful response without EHBP framing");
+  };
   var encryptedFetch = async (proof, innerFetch, input, init) => {
     if (!proof.ehbpKeyConfig) throw new VerificationRequiredError("the verified evidence has no EHBP key configuration");
     const request = new Request(input, init);
-    if (request.method === "GET" || request.method === "HEAD" || request.body === null) {
-      return innerFetch(request);
-    }
+    sameVerifiedOrigin(request, proof);
     const identity = await Identity.unmarshalPublicConfig(proof.ehbpKeyConfig);
-    const transport = new Transport(identity, new URL(request.url).host);
-    if (innerFetch === fetch) return transport.request(request);
-    const original = globalThis.fetch;
-    const host = new URL(request.url).host;
-    globalThis.fetch = ((inner, innerInit) => {
-      const innerURL = typeof inner === "string" ? inner : inner instanceof URL ? inner.href : inner.url;
-      if (new URL(innerURL).host === host) return innerFetch(inner, innerInit);
-      return original(inner, innerInit);
-    });
-    try {
-      return await transport.request(request);
-    } finally {
-      globalThis.fetch = original;
-    }
+    const encrypted = await identity.encryptRequestWithContext(request);
+    const response = await innerFetch(encrypted.request);
+    if (!encrypted.context) return response;
+    if (!await mustDecryptEHBPResponse(response)) return response;
+    return identity.decryptResponseWithContext(response, encrypted.context);
   };
   var fetchForProof = (proof, reason, innerFetch, entitlement) => {
     return (async (input, init) => {
       if (!proof) throw new VerificationRequiredError(reason ?? "verification failed");
       if (proof.expiresEpoch <= Date.now() / 1e3) throw new VerificationRequiredError("the verified confidential proof has expired");
-      const headers = new Headers(init?.headers);
+      const originalRequest = new Request(input, init);
+      sameVerifiedOrigin(originalRequest, proof);
+      const headers = new Headers(originalRequest.headers);
       headers.delete("Authorization");
-      if (!entitlement) throw new VerificationRequiredError("a short-lived confidential entitlement is required");
-      headers.set("Authorization", `Bearer ${entitlement}`);
-      const requestInit = { ...init, headers };
-      return proof.ehbpKeyConfig ? encryptedFetch(proof, innerFetch, input, requestInit) : innerFetch(input, requestInit);
+      headers.set("Authorization", `Bearer ${requireEntitlement(entitlement)}`);
+      const request = new Request(originalRequest, { headers, redirect: "error" });
+      return proof.ehbpKeyConfig ? encryptedFetch(proof, innerFetch, request) : innerFetch(request);
     });
   };
   var createVerifiedOpenAI = async (options) => {

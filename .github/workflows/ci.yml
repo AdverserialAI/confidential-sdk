@@ -6,17 +6,25 @@ jobs:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: typescript}}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: AdverserialAI/attest-proxy
+          # Keep cross-repository test inputs reviewable. Bump this only in
+          # a reviewed SDK change after validating the new proxy release.
+          ref: 942648ec4200ade5a8d5b08c6d004d8931f395dd
           path: attest-proxy
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: {node-version: 22, cache: npm, cache-dependency-path: typescript/package-lock.json}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with: {go-version: '1.26.x'}
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:browser
+      # The browser bundle is a tracked distribution artifact. Refuse a pull
+      # request whose source and published bytes have drifted apart.
+      - run: git diff --exit-code -- browser
       - run: npm test
         env:
           ATTEST_PROXY_DIR: ${{ github.workspace }}/attest-proxy
@@ -24,8 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: python}}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: {python-version: '3.12'}
       - run: pip install -e .
       - run: python -m unittest discover -s tests -v
@@ -33,8 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: plugins}}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: {node-version: 22, cache: npm, cache-dependency-path: plugins/package-lock.json}
       # Plugin TypeScript projects compile the SDK source into their bundles.
       # Install the SDK's own runtime dependencies at that source boundary so
@@ -42,12 +52,16 @@ jobs:
       - run: npm ci --prefix ../typescript
       - run: npm ci
       - run: npm run build
+      # Claude/Kimi verifier CLIs are committed bundles. Keep their released
+      # bytes reproducibly tied to the reviewed plugin and SDK source.
+      - run: git diff --exit-code -- .
   gateway:
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: gateway}}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: {python-version: '3.12'}
       - run: pip install -e ../python -e .
       - run: python -m unittest discover -s tests -v

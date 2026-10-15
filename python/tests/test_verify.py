@@ -245,7 +245,23 @@ class SessionTests(unittest.TestCase):
 
     def test_pin_rejects_substituted_cert(self):
         """A session pinned to proxy A must refuse to talk to proxy B."""
-        with FakeAttestProxy() as good, FakeAttestProxy() as evil:
+        with FakeAttestProxy() as evil, FakeAttestProxy(endpoint=evil.endpoint) as good:
+            proof = verify_endpoint(
+                good.v1_url,
+                expected_model_id=MODEL,
+                trusted_receipt_keys=good.trusted_keys,
+                issuer=ISSUER,
+                audience=AUDIENCE,
+                expected_endpoint=evil.endpoint,
+                hardware_verifier=test_hardware_verifier,
+                allow_dev_mode=True,
+            )
+            session = VerifiedSession(evil.v1_url, proof=proof, entitlement="sk-test")
+            with self.assertRaises(TLSPinMismatchError):
+                session.chat_completions(messages=[{"role": "user", "content": "ping"}])
+
+    def test_session_refuses_a_proof_bound_to_another_endpoint_before_connecting(self):
+        with FakeAttestProxy() as good, FakeAttestProxy() as other:
             proof = verify_endpoint(
                 good.v1_url,
                 expected_model_id=MODEL,
@@ -255,9 +271,8 @@ class SessionTests(unittest.TestCase):
                 hardware_verifier=test_hardware_verifier,
                 allow_dev_mode=True,
             )
-            session = VerifiedSession(evil.v1_url, proof=proof, entitlement="sk-test")
-            with self.assertRaises(TLSPinMismatchError):
-                session.chat_completions(messages=[{"role": "user", "content": "ping"}])
+            with self.assertRaisesRegex(VerificationError, "endpoint does not match"):
+                VerifiedSession(other.v1_url, proof=proof, entitlement="sk-test")
 
     def test_session_requires_verified_proof(self):
         class Bogus:

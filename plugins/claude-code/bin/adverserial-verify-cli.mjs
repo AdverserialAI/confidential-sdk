@@ -33797,12 +33797,27 @@ var asEpochSeconds = (value, label) => {
   return value;
 };
 var hasAudience = (audienceClaim, expected) => typeof audienceClaim === "string" ? audienceClaim === expected : Array.isArray(audienceClaim) && audienceClaim.includes(expected);
+var endpointURL = (raw, label) => {
+  const parsed = new URL(raw);
+  if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error(`${label} must be a plain https URL without credentials, query, or fragment.`);
+  }
+  return parsed;
+};
 var verifyEndpoint = async (baseURL, options) => {
   try {
+    const endpoint = endpointURL(baseURL, "baseURL");
+    const expectedEndpoint = options.expectedEndpoint ?? endpoint.origin;
+    if (expectedEndpoint !== endpoint.origin) {
+      throw new Error("expected endpoint must equal the origin of baseURL.");
+    }
     const fetchImpl = options.fetchImpl ?? fetch;
     const nowMs = options.now?.() ?? Date.now();
     const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-    const attestationUrl = new URL(options.attestationUrl ?? "/attestation", baseURL);
+    const attestationUrl = new URL(options.attestationUrl ?? "/attestation", endpoint);
+    if (attestationUrl.protocol !== "https:" || attestationUrl.origin !== endpoint.origin) {
+      throw new Error("attestationUrl must remain on the configured HTTPS endpoint origin.");
+    }
     attestationUrl.searchParams.set("nonce", nonce);
     const response = await fetchImpl(attestationUrl, {
       method: "GET",
@@ -33837,7 +33852,7 @@ var verifyEndpoint = async (baseURL, options) => {
     if (asNonEmptyString(claims.model_id) !== options.expectedModelId) {
       throw new Error("The receipt model does not match the selected model.");
     }
-    if (options.expectedEndpoint && asNonEmptyString(claims.endpoint) !== options.expectedEndpoint) {
+    if (asNonEmptyString(claims.endpoint) !== expectedEndpoint) {
       throw new Error("The receipt is not bound to the configured inference endpoint.");
     }
     if (options.expectedModelDigest && asNonEmptyString(claims.model_digest) !== options.expectedModelDigest) {
@@ -33864,7 +33879,7 @@ var verifyEndpoint = async (baseURL, options) => {
       evidence,
       nonce,
       expectedModelId: options.expectedModelId,
-      expectedEndpoint: options.expectedEndpoint
+      expectedEndpoint
     });
     if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
       throw new Error("The hardware verifier did not accept the attestation evidence.");
@@ -33945,6 +33960,9 @@ var verifyEndpoint = async (baseURL, options) => {
     };
   }
 };
+
+// ../../typescript/src/openai.ts
+var MAX_EHBP_PROBLEM_BYTES = 64 * 1024;
 
 // ../../typescript/src/phala.ts
 var import_dcap_qvl = __toESM(require_src(), 1);

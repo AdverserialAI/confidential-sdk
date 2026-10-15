@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -127,6 +128,25 @@ class ReceiptTests(unittest.TestCase):
             stream = session.chat_completions(MESSAGES, stream=True)
             self.assertEqual(len(list(stream)), 2)
             self.assertFalse(stream.receipt_verified)
+
+    def test_quote_bound_ehbp_proof_cannot_be_downgraded(self):
+        with FakeAttestProxy() as fake:
+            proof = self.make_session(fake).proof
+            quote_bound = replace(proof, ehbp_key_config=b"attested-key-configuration")
+            with self.assertRaisesRegex(VerificationError, "cannot disable EHBP"):
+                VerifiedSession(
+                    fake.v1_url,
+                    proof=quote_bound,
+                    entitlement="sk-test-key-123",
+                    use_ehbp=False,
+                )
+            with self.assertRaisesRegex(VerificationError, "cannot disable signed inference receipts"):
+                VerifiedSession(
+                    fake.v1_url,
+                    proof=quote_bound,
+                    entitlement="sk-test-key-123",
+                    require_receipts=False,
+                )
 
 
 if __name__ == "__main__":

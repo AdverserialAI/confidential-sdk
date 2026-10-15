@@ -25,6 +25,19 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ConfigError, "executable file"):
                 Config.from_env({**env, "ADVERSERIAL_HARDWARE_VERIFIER_COMMAND": tmp})
 
+    def test_endpoint_configuration_refuses_credential_and_path_confusion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            keys = Path(tmp) / "keys.json"
+            keys.write_text(json.dumps({"kid": {"kty": "EC"}}))
+            env = {"ADVERSERIAL_RECEIPT_KEYS_FILE": str(keys), "ADVERSERIAL_HARDWARE_VERIFIER_COMMAND": sys.executable}
+            for name, value in (
+                ("ADVERSERIAL_CC_API_URL", "https://user:pass@api.example/v1"),
+                ("ADVERSERIAL_CC_API_URL", "https://api.example/v1?redirect=https://evil.example"),
+                ("ADVERSERIAL_BILLING_URL", "https://billing.example/not-the-billing-origin"),
+            ):
+                with self.subTest(name=name, value=value), self.assertRaises(ConfigError):
+                    Config.from_env({**env, name: value})
+
 
 if __name__ == "__main__":
     unittest.main()

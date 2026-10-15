@@ -48,6 +48,37 @@ def _sha256_b64(data: bytes) -> str:
     return "sha256:" + b64url_encode(hashlib.sha256(data).digest())
 
 
+def _https_origin(value: str, *, label: str, origin_only: bool = False) -> tuple[str, str, int, str]:
+    """Validate an HTTPS URL and return (origin, host, port, path).
+
+    The attestation policy binds a runtime key to an origin, not an arbitrary
+    URL string.  Normalizing here prevents a proof for one virtual host from
+    being reused through a different URL that happens to share a certificate.
+    """
+    try:
+        parts = urlsplit(value)
+        port = parts.port
+    except ValueError as exc:
+        raise VerificationError(f"{label} must be a valid HTTPS URL") from exc
+    if (
+        parts.scheme != "https"
+        or not parts.hostname
+        or parts.username is not None
+        or parts.password is not None
+        or parts.query
+        or parts.fragment
+        or (origin_only and parts.path not in {"", "/"})
+    ):
+        raise VerificationError(f"{label} must be a plain HTTPS URL")
+    host = parts.hostname
+    rendered_host = f"[{host}]" if ":" in host else host
+    effective_port = port or 443
+    origin = f"https://{rendered_host}"
+    if effective_port != 443:
+        origin += f":{effective_port}"
+    return origin, host, effective_port, parts.path.rstrip("/")
+
+
 class UpstreamHTTPError(VerificationError):
     """The enclave answered a dispatched chat-completions request with a
     non-200 status. Carries the upstream status so callers can distinguish a
@@ -133,21 +164,39 @@ class VerifiedSession:
                 "VerifiedSession requires a proof with status 'verified'; "
                 "call verify_endpoint() first"
             )
-        parts = urlsplit(base_url)
-        if parts.scheme != "https" or not parts.hostname:
-            raise VerificationError(f"endpoint URL must be https://…, got {base_url!r}")
-        self._host = parts.hostname
-        self._port = parts.port or 443
-        self._base_path = parts.path.rstrip("/")
+        origin, host, port, path = _https_origin(base_url, label="endpoint URL")
+        if proof.endpoint is not None:
+            proof_origin, _, _, _ = _https_origin(
+                proof.endpoint,
+                label="verified proof endpoint",
+                origin_only=True,
+            )
+            if proof_origin != origin:
+                raise VerificationError(
+                    "verified proof endpoint does not match the requested inference endpoint"
+                )
+        self._host = host
+        self._port = port
+        self._base_path = path
         self._proof = proof
         self._entitlement = entitlement
         self._timeout = timeout
         self._require_receipts = require_receipts
+        if use_ehbp is not None and not isinstance(use_ehbp, bool):
+            raise VerificationError("use_ehbp must be a boolean when supplied")
+        if not isinstance(require_receipts, bool):
+            raise VerificationError("require_receipts must be a boolean")
         # A proof with a quote-bound EHBP key automatically selects encrypted
-        # request/response transport. Explicit false exists only for migration
-        # testing against an older non-EHBP endpoint; a production EHBP-required
-        # proxy rejects that downgrade.
-        self._use_ehbp = bool(proof.ehbp_key_config) if use_ehbp is None else use_ehbp
+        # request/response transport. Explicit false remains only for a
+        # legacy proof that has no EHBP key at all; a caller must never be
+        # able to downgrade a verified production endpoint to plaintext after
+        # it has advertised its quote-bound receiver key.
+        ehbp_available = proof.ehbp_key_config is not None
+        if ehbp_available and use_ehbp is False:
+            raise VerificationError("cannot disable EHBP for an endpoint whose verified evidence requires it")
+        if ehbp_available and not require_receipts:
+            raise VerificationError("cannot disable signed inference receipts for an EHBP-attested endpoint")
+        self._use_ehbp = ehbp_available if use_ehbp is None else use_ehbp
         if self._use_ehbp and not proof.ehbp_key_config:
             raise VerificationError("EHBP was requested but the verified evidence has no EHBP key configuration")
         if self._use_ehbp and not self._entitlement:
