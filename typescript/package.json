@@ -2,7 +2,7 @@
   "name": "@adverserial/sdk",
   "version": "0.1.0",
   "description": "Client-side verification SDK for Adverserial confidential-inference endpoints: attestation verification + TLS binding, for browsers and Node 18+",
-  "license": "Apache-2.0",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -2,7 +2,7 @@
   "name": "@adverserial/kimi-code-plugin",
   "version": "0.1.0",
   "description": "Kimi Code CLI plugin: verify the attestation of the Adverserial confidential inference endpoint (CLI + skill + session hook)",
-  "license": "Apache-2.0",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/adverserial-verify.bundle.mjs",
   "bin": {
