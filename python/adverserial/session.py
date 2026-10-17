@@ -298,6 +298,21 @@ class VerifiedSession:
         except Exception as exc:  # reference library exposes several concrete errors
             raise VerificationError("the attested EHBP key configuration is invalid") from exc
 
+    @staticmethod
+    def _error_detail(encrypted, response, wire_body: bytes) -> str:
+        """Plaintext for an upstream error body. Confidential error responses
+        are EHBP-encrypted like successful ones; decrypt when the response
+        nonce is present so callers see the gate's actual rejection reason
+        instead of ciphertext. Falls back to the raw body."""
+        nonce_header = response.getheader(RESPONSE_NONCE_HEADER)
+        if nonce_header:
+            try:
+                plain = encrypted.token.decrypt_response_body(bytes.fromhex(nonce_header), wire_body)
+                return plain[:200].decode("utf-8", "replace")
+            except Exception:
+                pass
+        return wire_body[:200].decode("utf-8", "replace")
+
     def _ehbp_completion(self, body: bytes, nonce: Optional[str], model_id: str) -> CompletionResponse:
         """Use the maintained EHBP reference framing over a hard-SPKI-pinned TLS connection."""
         if nonce is None:
@@ -318,7 +333,7 @@ class VerifiedSession:
             wire_body = response.read()
             receipt_token = response.getheader("X-Adverserial-Receipt")
             if response.status != 200:
-                raise UpstreamHTTPError(response.status, wire_body[:200].decode("utf-8", "replace"))
+                raise UpstreamHTTPError(response.status, self._error_detail(encrypted, response, wire_body))
             try:
                 response_nonce = response.getheader(RESPONSE_NONCE_HEADER)
                 if not response_nonce:
@@ -398,7 +413,7 @@ class VerifiedSession:
         if response.status != 200:
             data = response.read()
             connection.close()
-            raise UpstreamHTTPError(response.status, data[:200].decode("utf-8", "replace"))
+            raise UpstreamHTTPError(response.status, self._error_detail(encrypted, response, data))
         nonce_header = response.getheader(RESPONSE_NONCE_HEADER)
         if not nonce_header:
             connection.close()
