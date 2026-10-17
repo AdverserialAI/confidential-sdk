@@ -238,7 +238,7 @@ class VerifiedSession:
         """Send a JSON request over a pinned connection; return parsed JSON."""
         connection = self._connect()
         try:
-            body = json.dumps(payload).encode("utf-8") if payload is not None else None
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8") if payload is not None else None
             headers = self._headers(
                 {"Content-Type": "application/json"} if body is not None else None
             )
@@ -280,7 +280,12 @@ class VerifiedSession:
             "stream": bool(stream),
         }
         payload.update(params)
-        body = json.dumps(payload).encode("utf-8")
+        # ensure_ascii=False is load-bearing: the gateway reserves the billing
+        # input bound as 2x the UTF-8 body length. ASCII escaping inflates
+        # non-ASCII content up to 3-6x (6-byte escape sequences, surrogate pairs
+        # for astral characters), which would exceed the minted bound and fail
+        # entitlement validation (401).
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         nonce = self._new_request_nonce()
         if stream:
             if self._use_ehbp:

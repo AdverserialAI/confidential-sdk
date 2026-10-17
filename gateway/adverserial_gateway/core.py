@@ -68,6 +68,20 @@ def _direct_billing_opener() -> urllib.request.OpenerDirector:
     )
 
 
+def _entitlement_claims(entitlement: str) -> dict | None:
+    """Decode a minted entitlement's claims (the JWS payload). None when
+    undecodable; signature validity is the enclave's job, not ours."""
+    try:
+        parts = entitlement.split(".")
+        if len(parts) != 3:
+            return None
+        import base64 as _b64
+        claims = json.loads(_b64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+        return claims if isinstance(claims, dict) else None
+    except Exception:
+        return None
+
+
 def canonical_model_id(model: str) -> str:
     """Return the runtime model used for a locally supported client model.
 
@@ -187,6 +201,14 @@ class Dispatcher:
         max_output = min(requested_output, self.config.max_output_tokens)
         proof = self.proof_for(model)
         entitlement = self.entitlement(api_key, model, max_input, max_output, proof)
+        # Billing may scale the reservation's output bound down to the plan's
+        # remaining allowance (meter.py clamps min(wanted, day, week)). The
+        # enclave gate 401s a request whose max_tokens exceeds the minted
+        # bound, so the forwarded request follows the entitlement.
+        claims = _entitlement_claims(entitlement)
+        minted_output = claims.get("max_output_tokens") if claims else None
+        if isinstance(minted_output, int) and not isinstance(minted_output, bool) and 1 <= minted_output < max_output:
+            max_output = minted_output
         outbound = dict(payload)
         outbound.pop("model", None)
         stream = bool(outbound.pop("stream", False))
@@ -225,12 +247,8 @@ class Dispatcher:
         """Best-effort release of the billing reservation behind a minted
         entitlement (its jti is the reservation id). Never raises."""
         try:
-            parts = entitlement.split(".")
-            if len(parts) != 3:
-                return
-            import base64 as _b64
-            claims = json.loads(_b64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
-            reservation_id = claims.get("jti")
+            claims = _entitlement_claims(entitlement)
+            reservation_id = claims.get("jti") if claims else None
             if not isinstance(reservation_id, str) or not reservation_id:
                 return
             request = urllib.request.Request(
