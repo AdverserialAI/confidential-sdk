@@ -36,4 +36,20 @@ The extension never stores or forwards the API key itself. Pi sends it only to
 Use `/adverserial-verify` or the `adverserial_verify` tool to force a fresh
 attestation check during a session.
 
+## Local swarm coordination
+
+When Pi is launched through `ack code pi`, the extension also exposes
+`adverserial_swarm_inbox` and `adverserial_swarm_post`. They coordinate with
+tasks explicitly created by `ack swarm`:
+
+```sh
+ack swarm create review
+ack swarm invite --to pi "Review the gateway cancellation path."
+```
+
+Pi can read the task with `adverserial_swarm_inbox`, then post a concise result
+back to Claude or every participant with `adverserial_swarm_post`. The shared
+room contains only messages deliberately added to it; it never copies a
+harness’s private conversation or credentials.
+
 Please report security vulnerabilities privately to security@adverserial.ai.

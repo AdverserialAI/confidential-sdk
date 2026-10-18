@@ -60,6 +60,39 @@ const runVerifier = (args: string[] = []): Promise<{ ok: boolean; output: string
 		child.once('close', (code) => resolve({ ok: code === 0, output: output.trim() || `Verifier exited ${code ?? 'by signal'}.` }));
 	});
 
+type AckInvocation = { command: string; args: string[] } | { error: string };
+
+const ack = (): AckInvocation => {
+	const configured = process.env.ADVERSERIAL_ACK_CLI?.trim();
+	if (!configured) return { error: 'The Adverserial swarm CLI is unavailable. Start Pi with `ack code pi`.' };
+	if (!isAbsolute(configured)) return { error: 'ADVERSERIAL_ACK_CLI must be an absolute path.' };
+	try {
+		const script = realpathSync(configured);
+		if (!statSync(script).isFile()) throw new Error('not a file');
+		accessSync(script, constants.R_OK);
+		return { command: process.execPath, args: [script] };
+	} catch {
+		return { error: 'The configured Adverserial swarm CLI is missing or unreadable. Run `ack upgrade`.' };
+	}
+};
+
+const runAck = (args: string[]): Promise<{ ok: boolean; output: string }> =>
+	new Promise((resolve) => {
+		const invocation = ack();
+		if ('error' in invocation) { resolve({ ok: false, output: invocation.error }); return; }
+		const child = spawn(invocation.command, [...invocation.args, ...args], {
+			shell: false,
+			env: { ...process.env, ACK_QUIET: '1' },
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+		let output = '';
+		child.stdout.on('data', (chunk: Buffer) => { output += chunk.toString('utf8'); });
+		child.stderr.on('data', (chunk: Buffer) => { output += chunk.toString('utf8'); });
+		child.once('error', (error) => resolve({ ok: false, output: `Could not start the swarm CLI: ${error.message}` }));
+		child.once('close', (code) => resolve({ ok: code === 0, output: output.trim() || `ack exited ${code ?? 'by signal'}.` }));
+	});
+
 export default async function (pi: ExtensionAPI) {
 	const verdict = await runVerifier();
 	if (!verdict.ok) {
@@ -97,6 +130,40 @@ export default async function (pi: ExtensionAPI) {
 		async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
 			const result = await runVerifier();
 			return { content: [{ type: 'text', text: result.output }], details: { verified: result.ok } };
+		}
+	});
+
+	pi.registerTool({
+		name: 'adverserial_swarm_inbox',
+		label: 'Read confidential swarm inbox',
+		description: 'Read work explicitly assigned to Pi in the local Adverserial swarm room. This reads only user-created local task messages; it does not access another agent’s private context.',
+		parameters: Type.Object({}),
+		async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
+			const result = await runAck(['swarm', 'inbox', '--agent', 'pi']);
+			return { content: [{ type: 'text', text: result.output }], details: { ok: result.ok } };
+		}
+	});
+
+	pi.registerTool({
+		name: 'adverserial_swarm_post',
+		label: 'Post confidential swarm result',
+		description: 'Post Pi’s concise result or question to the selected participant in the local Adverserial swarm room. Never include credentials or unneeded sensitive prompt content.',
+		parameters: Type.Object({
+			message: Type.String({ description: 'The result, decision, or question to share.' }),
+			to: Type.Optional(Type.String({ description: 'Recipient harness: claude, codex, opencode, pi, hermes, kimi, or all. Defaults to all.' }))
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+			const recipient = params.to?.trim() || 'all';
+			const result = await runAck(['swarm', 'post', '--from', 'pi', '--to', recipient, params.message]);
+			return { content: [{ type: 'text', text: result.output }], details: { ok: result.ok } };
+		}
+	});
+
+	pi.registerCommand('adverserial-swarm-inbox', {
+		description: 'Read work explicitly assigned to Pi in the local confidential swarm room',
+		handler: async (_args, ctx) => {
+			const result = await runAck(['swarm', 'inbox', '--agent', 'pi']);
+			ctx.ui.notify(result.output, result.ok ? 'info' : 'warning');
 		}
 	});
 
