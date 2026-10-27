@@ -114,7 +114,7 @@ export const verifyNVIDIAEvidence = async (
 	}
 	const generatedMs = Date.parse(generatedAt);
 	const nowMs = options.now?.() ?? Date.now();
-	const maxAgeMs = options.maxAgeMs ?? 10 * 60_000;
+	const maxAgeMs = options.maxAgeMs ?? 30 * 60_000;
 	if (!Number.isFinite(generatedMs) || generatedMs > nowMs + 60_000 || nowMs - generatedMs > maxAgeMs) {
 		throw new Error('The NVIDIA evidence bundle is outside its freshness window.');
 	}
