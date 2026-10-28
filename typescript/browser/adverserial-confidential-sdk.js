@@ -32799,7 +32799,7 @@ ${pckCertChain}`;
     }
     const generatedMs = Date.parse(generatedAt);
     const nowMs = options.now?.() ?? Date.now();
-    const maxAgeMs = options.maxAgeMs ?? 10 * 6e4;
+    const maxAgeMs = options.maxAgeMs ?? 30 * 6e4;
     if (!Number.isFinite(generatedMs) || generatedMs > nowMs + 6e4 || nowMs - generatedMs > maxAgeMs) {
       throw new Error("The NVIDIA evidence bundle is outside its freshness window.");
     }
@@ -32853,7 +32853,7 @@ ${pckCertChain}`;
   var quoteReportData = (report) => report.asTd10()?.reportData ?? report.asTd15()?.base.reportData ?? (() => {
     throw new Error("The verified quote is not a TDX quote.");
   })();
-  var verifyPhalaTDXEvidence = async ({ evidence, nonce }) => {
+  var verifyPhalaTDXEvidence = async ({ evidence, nonce }, pccsURL) => {
     const quoteHex = nonEmpty(evidence.tdx_quote);
     const tlsSPKI = nonEmpty(evidence.tls_spki_der);
     const receiptJWK = asRecord2(evidence.receipt_pubkey_jwk);
@@ -32862,7 +32862,7 @@ ${pckCertChain}`;
     if (!quoteHex || !tlsSPKI || !receiptJWK || !ehbpPublic) {
       throw new Error("The evidence is incomplete for Phala TDX report-data verification.");
     }
-    const verified = await (0, import_dcap_qvl.getCollateralAndVerify)(fromHex(quoteHex));
+    const verified = await (0, import_dcap_qvl.getCollateralAndVerify)(fromHex(quoteHex), pccsURL);
     if (verified.status !== "UpToDate") {
       throw new Error(`Intel TDX verification did not reach UpToDate status: ${verified.status}.`);
     }
@@ -32881,10 +32881,11 @@ ${pckCertChain}`;
     return { verified: true, verifier: "@phala/dcap-qvl@0.6.5", tee: "Intel TDX" };
   };
   var createPhalaNVIDIAVerifier = (options) => async (input) => {
-    const tdx = await verifyPhalaTDXEvidence(input);
+    const tdx = await verifyPhalaTDXEvidence(input, options.pccsURL);
     const gpu = await verifyNVIDIAEvidence(input.evidence, {
       minimumGPUCount: options.minimumGPUCount,
-      maxAgeMs: options.maxGPUEvidenceAgeMs
+      maxAgeMs: options.maxGPUEvidenceAgeMs,
+      fetchImpl: options.fetchImpl
     });
     return {
       verified: true,

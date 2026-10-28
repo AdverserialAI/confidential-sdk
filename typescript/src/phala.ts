@@ -54,7 +54,10 @@ const quoteReportData = (report: { asTd10: () => { reportData: Uint8Array } | nu
  * It does not silently accept NVIDIA evidence; use a composition that checks
  * that signed EAT bundle if your policy requires GPU-confidential proof.
  */
-export const verifyPhalaTDXEvidence: HardwareEvidenceVerifier = async ({ evidence, nonce }) => {
+export const verifyPhalaTDXEvidence = async (
+	{ evidence, nonce }: Parameters<HardwareEvidenceVerifier>[0],
+	pccsURL?: string
+) => {
 	const quoteHex = nonEmpty(evidence.tdx_quote);
 	const tlsSPKI = nonEmpty(evidence.tls_spki_der);
 	const receiptJWK = asRecord(evidence.receipt_pubkey_jwk) as JsonWebKey | null;
@@ -64,7 +67,7 @@ export const verifyPhalaTDXEvidence: HardwareEvidenceVerifier = async ({ evidenc
 		throw new Error('The evidence is incomplete for Phala TDX report-data verification.');
 	}
 
-	const verified = await getCollateralAndVerify(fromHex(quoteHex));
+	const verified = await getCollateralAndVerify(fromHex(quoteHex), pccsURL);
 	if (verified.status !== 'UpToDate') {
 		throw new Error(`Intel TDX verification did not reach UpToDate status: ${verified.status}.`);
 	}
@@ -91,12 +94,18 @@ export const verifyPhalaTDXEvidence: HardwareEvidenceVerifier = async ({ evidenc
  * verified result; callers cannot accidentally present CPU-TEE-only proof as
  * a complete confidential-GPU proof.
  */
-export const createPhalaNVIDIAVerifier = (options: { minimumGPUCount: number; maxGPUEvidenceAgeMs?: number } ): HardwareEvidenceVerifier =>
+export const createPhalaNVIDIAVerifier = (options: {
+	minimumGPUCount: number;
+	maxGPUEvidenceAgeMs?: number;
+	fetchImpl?: typeof fetch;
+	pccsURL?: string;
+}): HardwareEvidenceVerifier =>
 	async input => {
-		const tdx = await verifyPhalaTDXEvidence(input);
+		const tdx = await verifyPhalaTDXEvidence(input, options.pccsURL);
 		const gpu = await verifyNVIDIAEvidence(input.evidence, {
 			minimumGPUCount: options.minimumGPUCount,
-			maxAgeMs: options.maxGPUEvidenceAgeMs
+			maxAgeMs: options.maxGPUEvidenceAgeMs,
+			fetchImpl: options.fetchImpl
 		});
 		return {
 			verified: true,
