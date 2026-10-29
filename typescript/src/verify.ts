@@ -19,6 +19,8 @@
 
 import { asArrayBuffer, evidenceDigest, fromBase64Url, sha256Digest, toBase64Url } from './canonjson.js';
 import { Identity } from 'ehbp';
+import { validateRuntimePolicy, checkWorkloadPolicy } from './runtime-policy.js';
+import type { RuntimePolicy, TDXPolicy } from './runtime-policy.js';
 import type { JsonRecord } from './canonjson.js';
 
 export type TrustedReceiptKeys = Record<string, JsonWebKey>;
@@ -42,9 +44,12 @@ export type HardwareEvidenceVerifier = (input: {
 	nonce: string;
 	expectedModelId: string;
 	expectedEndpoint?: string;
+	expectedTDXPolicy?: TDXPolicy;
 }) => Promise<HardwareVerification>;
 
 export type VerifyEndpointOptions = {
+	/** Approved runtime identity, required by production integrations. */
+	expectedPolicy?: RuntimePolicy;
 	/** Expected receipt claim `model_id`, e.g. "lordx64/cyberglm". */
 	expectedModelId: string;
 	/** Pinned receipt verification keys: JWS header kid -> public JWK (P-256). */
@@ -222,7 +227,8 @@ export const verifyEndpoint = async (
 			throw new Error('expected endpoint must equal the origin of baseURL.');
 		}
 		const fetchImpl = options.fetchImpl ?? fetch;
-		const nowMs = options.now?.() ?? Date.now();
+		const clock = options.now ?? Date.now;
+		const nowMs = clock();
 		const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 		const attestationUrl = new URL(options.attestationUrl ?? '/attestation', endpoint);
 		if (attestationUrl.protocol !== 'https:' || attestationUrl.origin !== endpoint.origin) {
@@ -246,6 +252,14 @@ export const verifyEndpoint = async (
 		if (!evidence || !receipt) throw new Error('The attestation response is missing evidence or a receipt.');
 
 		const { claims, keyId } = await verifyReceiptSignature(receipt, options.trustedReceiptKeys);
+
+    let policy = options.expectedPolicy ? validateRuntimePolicy(options.expectedPolicy, options.expectedModelId) : undefined;
+    if (!policy && endpoint.origin === 'https://api.adverserial.ai') {
+      const response = await fetchImpl('https://verify.adverserial.ai/policies/production.json', {credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(15000)});
+      if (!response.ok) throw new Error('The approved production policy is unavailable.');
+      policy = validateRuntimePolicy(await response.json(), options.expectedModelId);
+    }
+		if (policy) checkWorkloadPolicy(policy, evidence, claims as JsonRecord, keyId);
 		const issuedAt = asEpochSeconds(claims.iat, 'iat');
 		const expiresAt = asEpochSeconds(claims.exp, 'exp');
 		if (expiresAt * 1000 <= nowMs) throw new Error('The verification receipt has expired.');
@@ -308,7 +322,8 @@ export const verifyEndpoint = async (
 			evidence,
 			nonce,
 			expectedModelId: options.expectedModelId,
-			expectedEndpoint
+			expectedEndpoint,
+			expectedTDXPolicy: policy?.tdx
 		});
 		if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
 			throw new Error('The hardware verifier did not accept the attestation evidence.');
@@ -357,6 +372,7 @@ export const verifyEndpoint = async (
 				throw new Error('The evidence EHBP key configuration does not contain its quote-bound public key.');
 			}
 		}
+		if (expiresAt * 1000 <= clock()) throw new Error('The verification receipt expired during hardware verification.');
 		return {
 			status: 'verified',
 			proof: {

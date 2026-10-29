@@ -486,7 +486,7 @@ var AdverserialConfidentialSDK = (() => {
             return false;
         }
       };
-      Buffer2.concat = function concat2(list, length) {
+      Buffer2.concat = function concat3(list, length) {
         if (!Array.isArray(list)) {
           throw new TypeError('"list" argument must be an Array of Buffers');
         }
@@ -1038,10 +1038,10 @@ var AdverserialConfidentialSDK = (() => {
         return out;
       }
       function utf16leSlice(buf, start, end) {
-        const bytes = buf.slice(start, end);
+        const bytes2 = buf.slice(start, end);
         let res = "";
-        for (let i = 0; i < bytes.length - 1; i += 2) {
-          res += String.fromCharCode(bytes[i] + bytes[i + 1] * 256);
+        for (let i = 0; i < bytes2.length - 1; i += 2) {
+          res += String.fromCharCode(bytes2[i] + bytes2[i + 1] * 256);
         }
         return res;
       }
@@ -1564,13 +1564,13 @@ var AdverserialConfidentialSDK = (() => {
             this[i] = val;
           }
         } else {
-          const bytes = Buffer2.isBuffer(val) ? val : Buffer2.from(val, encoding);
-          const len = bytes.length;
+          const bytes2 = Buffer2.isBuffer(val) ? val : Buffer2.from(val, encoding);
+          const len = bytes2.length;
           if (len === 0) {
             throw new TypeError('The value "' + val + '" is invalid for argument "value"');
           }
           for (i = 0; i < end - start; ++i) {
-            this[i + start] = bytes[i % len];
+            this[i + start] = bytes2[i % len];
           }
         }
         return this;
@@ -1707,50 +1707,50 @@ var AdverserialConfidentialSDK = (() => {
         let codePoint;
         const length = string3.length;
         let leadSurrogate = null;
-        const bytes = [];
+        const bytes2 = [];
         for (let i = 0; i < length; ++i) {
           codePoint = string3.charCodeAt(i);
           if (codePoint > 55295 && codePoint < 57344) {
             if (!leadSurrogate) {
               if (codePoint > 56319) {
-                if ((units -= 3) > -1) bytes.push(239, 191, 189);
+                if ((units -= 3) > -1) bytes2.push(239, 191, 189);
                 continue;
               } else if (i + 1 === length) {
-                if ((units -= 3) > -1) bytes.push(239, 191, 189);
+                if ((units -= 3) > -1) bytes2.push(239, 191, 189);
                 continue;
               }
               leadSurrogate = codePoint;
               continue;
             }
             if (codePoint < 56320) {
-              if ((units -= 3) > -1) bytes.push(239, 191, 189);
+              if ((units -= 3) > -1) bytes2.push(239, 191, 189);
               leadSurrogate = codePoint;
               continue;
             }
             codePoint = (leadSurrogate - 55296 << 10 | codePoint - 56320) + 65536;
           } else if (leadSurrogate) {
-            if ((units -= 3) > -1) bytes.push(239, 191, 189);
+            if ((units -= 3) > -1) bytes2.push(239, 191, 189);
           }
           leadSurrogate = null;
           if (codePoint < 128) {
             if ((units -= 1) < 0) break;
-            bytes.push(codePoint);
+            bytes2.push(codePoint);
           } else if (codePoint < 2048) {
             if ((units -= 2) < 0) break;
-            bytes.push(
+            bytes2.push(
               codePoint >> 6 | 192,
               codePoint & 63 | 128
             );
           } else if (codePoint < 65536) {
             if ((units -= 3) < 0) break;
-            bytes.push(
+            bytes2.push(
               codePoint >> 12 | 224,
               codePoint >> 6 & 63 | 128,
               codePoint & 63 | 128
             );
           } else if (codePoint < 1114112) {
             if ((units -= 4) < 0) break;
-            bytes.push(
+            bytes2.push(
               codePoint >> 18 | 240,
               codePoint >> 12 & 63 | 128,
               codePoint >> 6 & 63 | 128,
@@ -1760,7 +1760,7 @@ var AdverserialConfidentialSDK = (() => {
             throw new Error("Invalid code point");
           }
         }
-        return bytes;
+        return bytes2;
       }
       function asciiToBytes(str) {
         const byteArray = [];
@@ -2008,9 +2008,9 @@ var AdverserialConfidentialSDK = (() => {
         }
         readBytes(length) {
           this.checkBounds(length);
-          const bytes = this.buffer.slice(this.offset, this.offset + length);
+          const bytes2 = this.buffer.slice(this.offset, this.offset + length);
           this.offset += length;
-          return new Uint8Array(bytes);
+          return new Uint8Array(bytes2);
         }
         remaining() {
           return this.buffer.length - this.offset;
@@ -5463,14 +5463,14 @@ var AdverserialConfidentialSDK = (() => {
         else
           return this.error(fail || "DecoderBuffer overrun");
       };
-      DecoderBuffer.prototype.skip = function skip(bytes, fail) {
-        if (!(this.offset + bytes <= this.length))
+      DecoderBuffer.prototype.skip = function skip(bytes2, fail) {
+        if (!(this.offset + bytes2 <= this.length))
           return this.error(fail || "DecoderBuffer overrun");
         const res = new DecoderBuffer(this.base);
         res._reporterState = this._reporterState;
         res.offset = this.offset;
-        res.length = this.offset + bytes;
-        this.offset += bytes;
+        res.length = this.offset + bytes2;
+        this.offset += bytes2;
         return res;
       };
       DecoderBuffer.prototype.raw = function raw(save) {
@@ -7116,8 +7116,8 @@ var AdverserialConfidentialSDK = (() => {
       };
       BlockHash.prototype._pad = function pad() {
         var len = this.pendingTotal;
-        var bytes = this._delta8;
-        var k = bytes - (len + this.padLength) % bytes;
+        var bytes2 = this._delta8;
+        var k = bytes2 - (len + this.padLength) % bytes2;
         var res = new Array(k + this.padLength);
         res[0] = 128;
         for (var i = 1; i < k; i++)
@@ -11488,12 +11488,12 @@ var AdverserialConfidentialSDK = (() => {
         };
       }
       utils.cachedProperty = cachedProperty;
-      function parseBytes(bytes) {
-        return typeof bytes === "string" ? utils.toArray(bytes, "hex") : bytes;
+      function parseBytes(bytes2) {
+        return typeof bytes2 === "string" ? utils.toArray(bytes2, "hex") : bytes2;
       }
       utils.parseBytes = parseBytes;
-      function intFromLE(bytes) {
-        return new BN(bytes, "hex", "le");
+      function intFromLE(bytes2) {
+        return new BN(bytes2, "hex", "le");
       }
       utils.intFromLE = intFromLE;
     }
@@ -11785,21 +11785,21 @@ var AdverserialConfidentialSDK = (() => {
       BasePoint.prototype.validate = function validate2() {
         return this.curve.validate(this);
       };
-      BaseCurve.prototype.decodePoint = function decodePoint(bytes, enc) {
-        bytes = utils.toArray(bytes, enc);
+      BaseCurve.prototype.decodePoint = function decodePoint(bytes2, enc) {
+        bytes2 = utils.toArray(bytes2, enc);
         var len = this.p.byteLength();
-        if ((bytes[0] === 4 || bytes[0] === 6 || bytes[0] === 7) && bytes.length - 1 === 2 * len) {
-          if (bytes[0] === 6)
-            assert(bytes[bytes.length - 1] % 2 === 0);
-          else if (bytes[0] === 7)
-            assert(bytes[bytes.length - 1] % 2 === 1);
+        if ((bytes2[0] === 4 || bytes2[0] === 6 || bytes2[0] === 7) && bytes2.length - 1 === 2 * len) {
+          if (bytes2[0] === 6)
+            assert(bytes2[bytes2.length - 1] % 2 === 0);
+          else if (bytes2[0] === 7)
+            assert(bytes2[bytes2.length - 1] % 2 === 1);
           var res = this.point(
-            bytes.slice(1, 1 + len),
-            bytes.slice(1 + len, 1 + 2 * len)
+            bytes2.slice(1, 1 + len),
+            bytes2.slice(1 + len, 1 + 2 * len)
           );
           return res;
-        } else if ((bytes[0] === 2 || bytes[0] === 3) && bytes.length - 1 === len) {
-          return this.pointFromX(bytes.slice(1, 1 + len), bytes[0] === 3);
+        } else if ((bytes2[0] === 2 || bytes2[0] === 3) && bytes2.length - 1 === len) {
+          return this.pointFromX(bytes2.slice(1, 1 + len), bytes2[0] === 3);
         }
         throw new Error("Unknown point format");
       };
@@ -12616,8 +12616,8 @@ var AdverserialConfidentialSDK = (() => {
         }
       }
       inherits(Point, Base.BasePoint);
-      MontCurve.prototype.decodePoint = function decodePoint(bytes, enc) {
-        return this.point(utils.toArray(bytes, enc), 1);
+      MontCurve.prototype.decodePoint = function decodePoint(bytes2, enc) {
+        return this.point(utils.toArray(bytes2, enc), 1);
       };
       MontCurve.prototype.point = function point(x, z) {
         return new Point(this, x, z);
@@ -14375,10 +14375,10 @@ var AdverserialConfidentialSDK = (() => {
           entropyEnc: options.entropy && options.entropyEnc || "utf8",
           nonce: this.n.toArray()
         });
-        var bytes = this.n.byteLength();
+        var bytes2 = this.n.byteLength();
         var ns2 = this.n.sub(new BN(2));
         for (; ; ) {
-          var priv2 = new BN(drbg.generate(bytes));
+          var priv2 = new BN(drbg.generate(bytes2));
           if (priv2.cmp(ns2) > 0)
             continue;
           priv2.iaddn(1);
@@ -14427,9 +14427,9 @@ var AdverserialConfidentialSDK = (() => {
         key = this.keyFromPrivate(key, enc);
         msg = this._truncateToN(msg, false, options.msgBitLength);
         assert(!msg.isNeg(), "Can not sign a negative message");
-        var bytes = this.n.byteLength();
-        var bkey = key.getPrivate().toArray("be", bytes);
-        var nonce = msg.toArray("be", bytes);
+        var bytes2 = this.n.byteLength();
+        var bkey = key.getPrivate().toArray("be", bytes2);
+        var nonce = msg.toArray("be", bytes2);
         assert(new BN(nonce).eq(msg), "Can not sign message");
         var drbg = new HmacDRBG({
           hash: this.hash,
@@ -14721,19 +14721,19 @@ var AdverserialConfidentialSDK = (() => {
         enc[this.encodingLength - 1] |= point.getX().isOdd() ? 128 : 0;
         return enc;
       };
-      EDDSA.prototype.decodePoint = function decodePoint(bytes) {
-        bytes = utils.parseBytes(bytes);
-        var lastIx = bytes.length - 1;
-        var normed = bytes.slice(0, lastIx).concat(bytes[lastIx] & ~128);
-        var xIsOdd = (bytes[lastIx] & 128) !== 0;
+      EDDSA.prototype.decodePoint = function decodePoint(bytes2) {
+        bytes2 = utils.parseBytes(bytes2);
+        var lastIx = bytes2.length - 1;
+        var normed = bytes2.slice(0, lastIx).concat(bytes2[lastIx] & ~128);
+        var xIsOdd = (bytes2[lastIx] & 128) !== 0;
         var y = utils.intFromLE(normed);
         return this.curve.pointFromY(y, xIsOdd);
       };
       EDDSA.prototype.encodeInt = function encodeInt(num) {
         return num.toArray("le", this.encodingLength);
       };
-      EDDSA.prototype.decodeInt = function decodeInt(bytes) {
-        return utils.intFromLE(bytes);
+      EDDSA.prototype.decodeInt = function decodeInt(bytes2) {
+        return utils.intFromLE(bytes2);
       };
       EDDSA.prototype.isPoint = function isPoint(val) {
         return val instanceof this.pointClass;
@@ -19475,7 +19475,7 @@ ${b64.match(/.{1,64}/g).join("\n")}
           throw new Error("BigInt is not defined. Your environment doesn't implement BigInt.");
         }
       }
-      function concat2(buffers) {
+      function concat3(buffers) {
         let outputLength = 0;
         let prevLength = 0;
         for (let i = 0; i < buffers.length; i++) {
@@ -19521,7 +19521,7 @@ ${b64.match(/.{1,64}/g).join("\n")}
           this.items.push(buf);
         }
         final() {
-          return concat2(this.items);
+          return concat3(this.items);
         }
       };
       var powers2 = [new Uint8Array([1])];
@@ -21042,8 +21042,8 @@ ${values.join("\n")}` : `${blockName} :`;
           assertBigInt();
           const bigIntValue = BigInt(value);
           const writer = new ViewWriter();
-          const hex2 = bigIntValue.toString(16).replace(/^-/, "");
-          const view = new Uint8Array(pvtsutils__namespace.Convert.FromHex(hex2));
+          const hex3 = bigIntValue.toString(16).replace(/^-/, "");
+          const view = new Uint8Array(pvtsutils__namespace.Convert.FromHex(hex3));
           if (bigIntValue < 0) {
             const first = new Uint8Array(view.length + (view[0] & 128 ? 1 : 0));
             first[0] |= 128;
@@ -21140,11 +21140,11 @@ ${values.join("\n")}` : `${blockName} :`;
           while (bits.length % 7) {
             bits = "0" + bits;
           }
-          const bytes = new Uint8Array(bits.length / 7);
-          for (let i = 0; i < bytes.length; i++) {
-            bytes[i] = parseInt(bits.slice(i * 7, i * 7 + 7), 2) + (i + 1 < bytes.length ? 128 : 0);
+          const bytes2 = new Uint8Array(bits.length / 7);
+          for (let i = 0; i < bytes2.length; i++) {
+            bytes2[i] = parseInt(bits.slice(i * 7, i * 7 + 7), 2) + (i + 1 < bytes2.length ? 128 : 0);
           }
-          this.fromBER(bytes.buffer, 0, bytes.length);
+          this.fromBER(bytes2.buffer, 0, bytes2.length);
         }
         toBER(sizeOnly) {
           if (this.isHexOnly) {
@@ -21241,7 +21241,7 @@ ${values.join("\n")}` : `${blockName} :`;
             }
             retBuffers.push(valueBuf);
           }
-          return concat2(retBuffers);
+          return concat3(retBuffers);
         }
         fromString(string3) {
           this.value = [];
@@ -21470,7 +21470,7 @@ ${values.join("\n")}` : `${blockName} :`;
             }
             retBuffers.push(valueBuf);
           }
-          return concat2(retBuffers);
+          return concat3(retBuffers);
         }
         fromString(string3) {
           this.value = [];
@@ -22684,7 +22684,7 @@ ${values.join("\n")}` : `${blockName} :`;
       "use strict";
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.concatToUint8Array = concatToUint8Array;
-      exports.concat = concat2;
+      exports.concat = concat3;
       var buffer_source_js_1 = require_buffer_source();
       function concatToUint8Array(buffers) {
         const views = [];
@@ -22702,7 +22702,7 @@ ${values.join("\n")}` : `${blockName} :`;
         }
         return result;
       }
-      function concat2(first, second, ...rest) {
+      function concat3(first, second, ...rest) {
         let buffers;
         let type;
         if (typeof second === "function") {
@@ -22717,8 +22717,8 @@ ${values.join("\n")}` : `${blockName} :`;
           }
           buffers.push(...rest);
         }
-        const bytes = concatToUint8Array(buffers);
-        return type ? (0, buffer_source_js_1.toView)(bytes, type) : bytes.buffer;
+        const bytes2 = concatToUint8Array(buffers);
+        return type ? (0, buffer_source_js_1.toView)(bytes2, type) : bytes2.buffer;
       }
     }
   });
@@ -22792,11 +22792,11 @@ ${values.join("\n")}` : `${blockName} :`;
         return normalized;
       }
       function encodeAscii(text2) {
-        const bytes = new Uint8Array(text2.length);
+        const bytes2 = new Uint8Array(text2.length);
         for (let i = 0; i < text2.length; i++) {
-          bytes[i] = text2.charCodeAt(i) & 255;
+          bytes2[i] = text2.charCodeAt(i) & 255;
         }
-        return bytes;
+        return bytes2;
       }
       function encodeUtf8(text2) {
         return new TextEncoder().encode(text2);
@@ -22816,9 +22816,9 @@ ${values.join("\n")}` : `${blockName} :`;
         return true;
       }
       function indexOf(data, pattern, options) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
         const needle = toPatternBytes(pattern, options);
-        const [start, end] = normalizeForwardRange(bytes.byteLength, options);
+        const [start, end] = normalizeForwardRange(bytes2.byteLength, options);
         if (needle.byteLength === 0) {
           return start;
         }
@@ -22827,16 +22827,16 @@ ${values.join("\n")}` : `${blockName} :`;
           return -1;
         }
         for (let offset = start; offset <= lastOffset; offset++) {
-          if (bytesEqualAt(bytes, needle, offset)) {
+          if (bytesEqualAt(bytes2, needle, offset)) {
             return offset;
           }
         }
         return -1;
       }
       function lastIndexOf(data, pattern, options) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
         const needle = toPatternBytes(pattern, options);
-        const [end, start] = normalizeReverseRange(bytes.byteLength, options);
+        const [end, start] = normalizeReverseRange(bytes2.byteLength, options);
         if (needle.byteLength === 0) {
           return start;
         }
@@ -22845,7 +22845,7 @@ ${values.join("\n")}` : `${blockName} :`;
           return -1;
         }
         for (let offset = firstOffset; offset >= end; offset--) {
-          if (bytesEqualAt(bytes, needle, offset)) {
+          if (bytesEqualAt(bytes2, needle, offset)) {
             return offset;
           }
         }
@@ -22855,37 +22855,37 @@ ${values.join("\n")}` : `${blockName} :`;
         return indexOf(data, pattern, options) !== -1;
       }
       function startsWith(data, pattern, options) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
         const needle = toPatternBytes(pattern, options);
-        if (needle.byteLength > bytes.byteLength) {
+        if (needle.byteLength > bytes2.byteLength) {
           return false;
         }
-        return bytesEqualAt(bytes, needle, 0);
+        return bytesEqualAt(bytes2, needle, 0);
       }
       function endsWith(data, pattern, options) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
         const needle = toPatternBytes(pattern, options);
-        if (needle.byteLength > bytes.byteLength) {
+        if (needle.byteLength > bytes2.byteLength) {
           return false;
         }
-        return bytesEqualAt(bytes, needle, bytes.byteLength - needle.byteLength);
+        return bytesEqualAt(bytes2, needle, bytes2.byteLength - needle.byteLength);
       }
       function slice3(data, start, end) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
-        const normalizedStart = normalizeSliceIndex(start, 0, bytes.byteLength);
-        const normalizedEnd = normalizeSliceIndex(end, bytes.byteLength, bytes.byteLength);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
+        const normalizedStart = normalizeSliceIndex(start, 0, bytes2.byteLength);
+        const normalizedEnd = normalizeSliceIndex(end, bytes2.byteLength, bytes2.byteLength);
         if (normalizedEnd <= normalizedStart) {
-          return bytes.subarray(normalizedStart, normalizedStart);
+          return bytes2.subarray(normalizedStart, normalizedStart);
         }
-        return bytes.subarray(normalizedStart, normalizedEnd);
+        return bytes2.subarray(normalizedStart, normalizedEnd);
       }
       function tail(data, length) {
-        const bytes = (0, buffer_source_js_1.toUint8Array)(data);
+        const bytes2 = (0, buffer_source_js_1.toUint8Array)(data);
         const normalizedLength = Number.isFinite(length) ? Math.max(0, Math.trunc(length)) : 0;
-        if (normalizedLength >= bytes.byteLength) {
-          return bytes;
+        if (normalizedLength >= bytes2.byteLength) {
+          return bytes2;
         }
-        return bytes.subarray(bytes.byteLength - normalizedLength);
+        return bytes2.subarray(bytes2.byteLength - normalizedLength);
       }
       function copy(data) {
         return (0, buffer_source_js_1.toUint8ArrayCopy)(data);
@@ -23009,9 +23009,9 @@ ${values.join("\n")}` : `${blockName} :`;
       exports.is = is;
       var index_js_1 = require_bytes();
       function encode2(data) {
-        const bytes = (0, index_js_1.toUint8Array)(data);
+        const bytes2 = (0, index_js_1.toUint8Array)(data);
         let result = "";
-        for (const byte of bytes) {
+        for (const byte of bytes2) {
           result += String.fromCharCode(byte);
         }
         return result;
@@ -23209,9 +23209,9 @@ ${values.join("\n")}` : `${blockName} :`;
         }
       }
       function encode2(data, options = {}) {
-        const bytes = (0, index_js_1.toUint8Array)(data);
+        const bytes2 = (0, index_js_1.toUint8Array)(data);
         const casing = options.case ?? "lower";
-        const pairs = Array.from(bytes, (byte) => {
+        const pairs = Array.from(bytes2, (byte) => {
           const text2 = byte.toString(16).padStart(2, "0");
           return casing === "upper" ? text2.toUpperCase() : text2;
         });
@@ -23344,12 +23344,12 @@ ${values.join("\n")}` : `${blockName} :`;
         return normalized === "" || BASE64_REGEX.test(normalized);
       }
       function encode2(data, _options) {
-        const bytes = (0, index_js_1.toUint8Array)(data);
+        const bytes2 = (0, index_js_1.toUint8Array)(data);
         const buffer = nodeBuffer();
         if (buffer) {
-          return buffer.from(bytes).toString("base64");
+          return buffer.from(bytes2).toString("base64");
         }
-        return btoa((0, binary_js_1.encode)(bytes));
+        return btoa((0, binary_js_1.encode)(bytes2));
       }
       function decode(text2, _options) {
         const normalized = normalize(text2);
@@ -23757,8 +23757,8 @@ ${values.join("\n")}` : `${blockName} :`;
             return requireCapability(converter, name, "format").call(converter, data, format);
           },
           transcode(text2, options) {
-            const bytes = this.decode(options.from, text2, options.fromOptions);
-            return this.encode(options.to, bytes, options.toOptions);
+            const bytes2 = this.decode(options.from, text2, options.fromOptions);
+            return this.encode(options.to, bytes2, options.toOptions);
           },
           detect(text2, options = {}) {
             const formatNames = options.formats?.length ? options.formats.map((name) => String(name)) : this.list().map((converter) => converter.name).filter((name) => !["binary", "utf8", "utf16be", "utf16le"].includes(keyOf(name)));
@@ -25382,14 +25382,14 @@ ${values.join("\n")}` : `${blockName} :`;
           if (parts.length !== 8) {
             throw new Error("Invalid IPv6 address");
           }
-          return parts.reduce((bytes, part) => {
+          return parts.reduce((bytes2, part) => {
             const num = parseInt(part, 16);
             if (isNaN(num) || num < 0 || num > 65535) {
               throw new Error("Invalid IPv6 address part");
             }
-            bytes.push(num >> 8 & 255);
-            bytes.push(num & 255);
-            return bytes;
+            bytes2.push(num >> 8 & 255);
+            bytes2.push(num & 255);
+            return bytes2;
           }, []);
         }
         static expandIPv6(ip) {
@@ -25408,10 +25408,10 @@ ${values.join("\n")}` : `${blockName} :`;
           }
           return [...left, ...Array(missing).fill("0"), ...right].join(":");
         }
-        static formatIPv6(bytes) {
+        static formatIPv6(bytes2) {
           const parts = [];
           for (let i = 0; i < 16; i += 2) {
-            parts.push((bytes[i] << 8 | bytes[i + 1]).toString(16));
+            parts.push((bytes2[i] << 8 | bytes2[i + 1]).toString(16));
           }
           return this.compressIPv6(parts.join(":"));
         }
@@ -25520,8 +25520,8 @@ ${values.join("\n")}` : `${blockName} :`;
             out.set(maskBytes, addr.length);
             return out.buffer;
           }
-          const bytes = this.isIPv4(text2) ? this.parseIPv4(text2) : this.parseIPv6(text2);
-          return new Uint8Array(bytes).buffer;
+          const bytes2 = this.isIPv4(text2) ? this.parseIPv4(text2) : this.parseIPv6(text2);
+          return new Uint8Array(bytes2).buffer;
         }
       };
       exports.IpConverter = IpConverter;
@@ -27807,12 +27807,12 @@ ${lines.join("\n")}
         return Buffer2.from(AsnSerializer.serialize(name));
       }
       function serialBytes(serial) {
-        let bytes = Buffer2.from(serial);
-        const signByte = bytes.length > 0 && (bytes[0] & 128) !== 0 ? 1 : 0;
-        while (bytes.length > 1 && bytes[0] === 0) {
-          bytes = bytes.subarray(1);
+        let bytes2 = Buffer2.from(serial);
+        const signByte = bytes2.length > 0 && (bytes2[0] & 128) !== 0 ? 1 : 0;
+        while (bytes2.length > 1 && bytes2[0] === 0) {
+          bytes2 = bytes2.subarray(1);
         }
-        return Buffer2.concat([Buffer2.from([signByte]), bytes]);
+        return Buffer2.concat([Buffer2.from([signByte]), bytes2]);
       }
       function validateNow(timeSecs) {
         if (typeof timeSecs !== "number" || !Number.isFinite(timeSecs) || timeSecs < 0) {
@@ -28138,13 +28138,13 @@ ${lines.join("\n")}
           return null;
         }
       }
-      function decodeEnumerated(bytes) {
-        if (bytes.length === 1) {
-          return bytes[0];
-        } else if (bytes.length === 2) {
-          return bytes[0] << 8 | bytes[1];
+      function decodeEnumerated(bytes2) {
+        if (bytes2.length === 1) {
+          return bytes2[0];
+        } else if (bytes2.length === 2) {
+          return bytes2[0] << 8 | bytes2[1];
         } else {
-          throw new Error(`Unexpected ENUMERATED length: ${bytes.length}`);
+          throw new Error(`Unexpected ENUMERATED length: ${bytes2.length}`);
         }
       }
       function parsePckExtension(certDer) {
@@ -28932,6 +28932,7 @@ ${pckCertChain}`;
     VerificationRequiredError: () => VerificationRequiredError,
     createPhalaNVIDIAVerifier: () => createPhalaNVIDIAVerifier,
     createVerifiedOpenAI: () => createVerifiedOpenAI,
+    validateRuntimePolicy: () => validateRuntimePolicy,
     verifyEndpoint: () => verifyEndpoint,
     verifyInferenceReceipt: () => verifyInferenceReceipt
   });
@@ -28944,9 +28945,9 @@ ${pckCertChain}`;
     const object = value;
     return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(object[key])}`).join(",")}}`;
   };
-  var toBase64Url = (bytes) => {
+  var toBase64Url = (bytes2) => {
     let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
+    for (const byte of bytes2) binary += String.fromCharCode(byte);
     return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
   };
   var fromBase64Url = (value) => {
@@ -28955,9 +28956,9 @@ ${pckCertChain}`;
     const binary = atob(padded);
     return Uint8Array.from(binary, (character) => character.charCodeAt(0));
   };
-  var asArrayBuffer = (bytes) => {
-    const copy = new Uint8Array(bytes.byteLength);
-    copy.set(bytes);
+  var asArrayBuffer = (bytes2) => {
+    const copy = new Uint8Array(bytes2.byteLength);
+    copy.set(bytes2);
     return copy.buffer;
   };
   var sha256Digest = async (value) => {
@@ -29387,15 +29388,15 @@ ${pckCertChain}`;
     return Uint8Array.prototype.slice.call(buffer, start, end);
   }
   function encode(string3) {
-    const bytes = new Uint8Array(string3.length);
+    const bytes2 = new Uint8Array(string3.length);
     for (let i = 0; i < string3.length; i++) {
       const code = string3.charCodeAt(i);
       if (code > 127) {
         throw new TypeError("Input string must contain only ASCII characters");
       }
-      bytes[i] = code;
+      bytes2[i] = code;
     }
-    return bytes;
+    return bytes2;
   }
   var L_HPKE_v1 = /* @__PURE__ */ encode("HPKE-v1");
   var L_HPKE = /* @__PURE__ */ encode("HPKE");
@@ -29593,8 +29594,8 @@ ${pckCertChain}`;
     if (cached && cached.bytes.byteLength === keyBytes.byteLength && cached.bytes.every((byte, index) => byte === keyBytes[index])) {
       return cached.key;
     }
-    const bytes = slice(keyBytes);
-    const entry = { bytes, key: init(bytes) };
+    const bytes2 = slice(keyBytes);
+    const entry = { bytes: bytes2, key: init(bytes2) };
     cache.set(keyBytes, entry);
     try {
       return await entry.key;
@@ -29632,7 +29633,7 @@ ${pckCertChain}`;
         const key = await getCachedCryptoKey(
           cache,
           prk,
-          (bytes) => importKey.call(this, bytes)
+          (bytes2) => importKey.call(this, bytes2)
         );
         const T = new Uint8Array(N * this.Nh);
         let T_prev = new Uint8Array();
@@ -29668,7 +29669,7 @@ ${pckCertChain}`;
         if (pt.byteLength > P_MAX) {
           throw new RangeError('"pt" exceeds P_MAX');
         }
-        const cryptoKey = await getCachedCryptoKey(cache, key, (bytes) => importKey.call(this, bytes));
+        const cryptoKey = await getCachedCryptoKey(cache, key, (bytes2) => importKey.call(this, bytes2));
         return new Uint8Array(
           await subtle(
             (c) => c.encrypt(
@@ -29685,7 +29686,7 @@ ${pckCertChain}`;
         );
       },
       async Open(key, nonce, aad, ct) {
-        const cryptoKey = await getCachedCryptoKey(cache, key, (bytes) => importKey.call(this, bytes));
+        const cryptoKey = await getCachedCryptoKey(cache, key, (bytes2) => importKey.call(this, bytes2));
         return new Uint8Array(
           await subtle(
             (c) => c.decrypt(
@@ -29744,11 +29745,11 @@ ${pckCertChain}`;
       return value;
     if (length !== void 0)
       anumber(length, "length");
-    const bytes = isBytes(value);
+    const bytes2 = isBytes(value);
     const ofLen = length !== void 0 ? ` of length ${length}` : "";
-    const got = bytes ? `length=${value.length}` : `type=${typeof value}`;
+    const got = bytes2 ? `length=${value.length}` : `type=${typeof value}`;
     const message = atitle(title) + "expected Uint8Array" + ofLen + ", got " + got;
-    if (!bytes)
+    if (!bytes2)
       throw new TypeError(message);
     throw new RangeError(message);
   }
@@ -29801,41 +29802,41 @@ ${pckCertChain}`;
     typeof Uint8Array.from([]).toHex === "function" && typeof Uint8Array.fromHex === "function"
   ))();
   var hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-  function bytesToHex(bytes) {
-    abytes(bytes);
+  function bytesToHex(bytes2) {
+    abytes(bytes2);
     if (hasHexBuiltin)
-      return bytes.toHex();
-    let hex2 = "";
-    for (let i = 0; i < bytes.length; i++) {
-      hex2 += hexes[bytes[i]];
+      return bytes2.toHex();
+    let hex3 = "";
+    for (let i = 0; i < bytes2.length; i++) {
+      hex3 += hexes[bytes2[i]];
     }
-    return hex2;
+    return hex3;
   }
   function asciiToBase16(ch) {
     return ch >= 48 && ch <= 57 ? ch - 48 : ch >= 65 && ch <= 70 ? ch - (65 - 10) : ch >= 97 && ch <= 102 ? ch - (97 - 10) : void 0;
   }
-  function hexToBytes(hex2) {
-    if (typeof hex2 !== "string")
-      throw new TypeError("hex string expected, got " + typeof hex2);
+  function hexToBytes(hex3) {
+    if (typeof hex3 !== "string")
+      throw new TypeError("hex string expected, got " + typeof hex3);
     if (hasHexBuiltin) {
       try {
-        return Uint8Array.fromHex(hex2);
+        return Uint8Array.fromHex(hex3);
       } catch (error) {
         if (error instanceof SyntaxError)
           throw new RangeError(error.message);
         throw error;
       }
     }
-    const hl = hex2.length;
+    const hl = hex3.length;
     const al = hl / 2;
     if (hl % 2)
       throw new RangeError("hex string expected, got unpadded hex of length " + hl);
     const array = new Uint8Array(al);
     for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
-      const n1 = asciiToBase16(hex2.charCodeAt(hi));
-      const n2 = asciiToBase16(hex2.charCodeAt(hi + 1));
+      const n1 = asciiToBase16(hex3.charCodeAt(hi));
+      const n2 = asciiToBase16(hex3.charCodeAt(hi + 1));
       if (n1 === void 0 || n2 === void 0) {
-        const char = hex2[hi] + hex2[hi + 1];
+        const char = hex3[hi] + hex3[hi + 1];
         throw new RangeError('hex string expected, got non-hex character "' + char + '" at index ' + hi);
       }
       array[ai] = n1 * 16 + n2;
@@ -30314,7 +30315,7 @@ ${pckCertChain}`;
     return value;
   }
   var bytesToHex2 = bytesToHex;
-  var hexToBytes2 = (hex2) => hexToBytes(hex2);
+  var hexToBytes2 = (hex3) => hexToBytes(hex3);
   var isBytes2 = isBytes;
   var randomBytes2 = (bytesLength) => randomBytes(bytesLength);
   var _0n = /* @__PURE__ */ BigInt(0);
@@ -30343,16 +30344,16 @@ ${pckCertChain}`;
       throw new RangeError(prefix + "expected safe integer, got " + value);
     }
   }
-  function hexToNumber(hex2) {
-    if (typeof hex2 !== "string")
-      throw new TypeError("hex string expected, got " + typeof hex2);
-    return hex2 === "" ? _0n : BigInt("0x" + hex2);
+  function hexToNumber(hex3) {
+    if (typeof hex3 !== "string")
+      throw new TypeError("hex string expected, got " + typeof hex3);
+    return hex3 === "" ? _0n : BigInt("0x" + hex3);
   }
-  function bytesToNumberBE(bytes) {
-    return hexToNumber(bytesToHex(bytes));
+  function bytesToNumberBE(bytes2) {
+    return hexToNumber(bytesToHex(bytes2));
   }
-  function bytesToNumberLE(bytes) {
-    return hexToNumber(bytesToHex(copyBytes(abytes(bytes)).reverse()));
+  function bytesToNumberLE(bytes2) {
+    return hexToNumber(bytesToHex(copyBytes(abytes(bytes2)).reverse()));
   }
   function numberToBytesBE(n, len) {
     anumber(len);
@@ -30360,16 +30361,16 @@ ${pckCertChain}`;
       throw new Error("zero output length is invalid");
     n = abignumber(n);
     const expectedLen = len * 2;
-    const hex2 = n.toString(16);
-    if (hex2.length > expectedLen)
+    const hex3 = n.toString(16);
+    if (hex3.length > expectedLen)
       throw new RangeError("number is too large");
-    return hexToBytes(hex2.padStart(expectedLen, "0"));
+    return hexToBytes(hex3.padStart(expectedLen, "0"));
   }
   function numberToBytesLE(n, len) {
     return numberToBytesBE(n, len).reverse();
   }
-  function copyBytes(bytes) {
-    return Uint8Array.from(abytes2(bytes));
+  function copyBytes(bytes2) {
+    return Uint8Array.from(abytes2(bytes2));
   }
   function isPosBig(n) {
     return typeof n === "bigint" && _0n <= n;
@@ -30802,20 +30803,20 @@ ${pckCertChain}`;
     toBytes(num) {
       return this.isLE ? numberToBytesLE(num, this.BYTES) : numberToBytesBE(num, this.BYTES);
     }
-    fromBytes(bytes, skipValidation = false) {
-      abytes2(bytes);
+    fromBytes(bytes2, skipValidation = false) {
+      abytes2(bytes2);
       const { _lengths: allowedLengths, BYTES, isLE, ORDER, _mod: modFromBytes } = this;
       if (allowedLengths) {
-        if (bytes.length < 1 || !allowedLengths.includes(bytes.length) || bytes.length > BYTES) {
-          throw new Error("Field.fromBytes: expected " + allowedLengths + " bytes, got " + bytes.length);
+        if (bytes2.length < 1 || !allowedLengths.includes(bytes2.length) || bytes2.length > BYTES) {
+          throw new Error("Field.fromBytes: expected " + allowedLengths + " bytes, got " + bytes2.length);
         }
         const padded = new Uint8Array(BYTES);
-        padded.set(bytes, isLE ? 0 : padded.length - bytes.length);
-        bytes = padded;
+        padded.set(bytes2, isLE ? 0 : padded.length - bytes2.length);
+        bytes2 = padded;
       }
-      if (bytes.length !== BYTES)
-        throw new Error("Field.fromBytes: expected " + BYTES + " bytes, got " + bytes.length);
-      let scalar = isLE ? bytesToNumberLE(bytes) : bytesToNumberBE(bytes);
+      if (bytes2.length !== BYTES)
+        throw new Error("Field.fromBytes: expected " + BYTES + " bytes, got " + bytes2.length);
+      let scalar = isLE ? bytesToNumberLE(bytes2) : bytesToNumberBE(bytes2);
       if (modFromBytes)
         scalar = mod(scalar, ORDER);
       if (!skipValidation) {
@@ -30871,9 +30872,9 @@ ${pckCertChain}`;
       throw new Error("invalid window size, expected [" + min + ".." + bits + "], got W=" + W);
   }
   function validateTableBytes(numPoints, fpBytes) {
-    const bytes = numPoints * (4 * fpBytes + 128);
-    if (bytes > TABLE_BYTES_MAX)
-      throw new Error("invalid window size: table would need ~" + Math.ceil(bytes / 2 ** 20) + " MiB, max " + TABLE_BYTES_MAX / 2 ** 20 + " MiB");
+    const bytes2 = numPoints * (4 * fpBytes + 128);
+    if (bytes2 > TABLE_BYTES_MAX)
+      throw new Error("invalid window size: table would need ~" + Math.ceil(bytes2 / 2 ** 20) + " MiB, max " + TABLE_BYTES_MAX / 2 ** 20 + " MiB");
   }
   function probeRandomBytes(randomBytes3, length) {
     if (randomBytes3 === void 0)
@@ -31311,13 +31312,13 @@ ${pckCertChain}`;
         return new Point(x, y, Fp.ONE, Fp.mul(x, y));
       }
       // Uses algo from RFC8032 5.1.3.
-      static fromBytes(bytes, zip215 = false) {
+      static fromBytes(bytes2, zip215 = false) {
         const len = Fp.BYTES;
         const { a, d } = CURVE;
-        bytes = copyBytes(abytes2(bytes, len, "point"));
+        bytes2 = copyBytes(abytes2(bytes2, len, "point"));
         abool(zip215, "zip215");
-        const normed = copyBytes(bytes);
-        const lastByte = bytes[len - 1];
+        const normed = copyBytes(bytes2);
+        const lastByte = bytes2[len - 1];
         normed[len - 1] = lastByte & ~128;
         const y = bytesToNumberLE(normed);
         const max = zip215 ? MASK : Fp.ORDER;
@@ -31336,8 +31337,8 @@ ${pckCertChain}`;
           x = Fp.neg(x);
         return Point.fromAffine({ x, y });
       }
-      static fromHex(hex2, zip215 = false) {
-        return Point.fromBytes(hexToBytes2(hex2), zip215);
+      static fromHex(hex3, zip215 = false) {
+        return Point.fromBytes(hexToBytes2(hex3), zip215);
       }
       get x() {
         return this.toAffine().x;
@@ -31501,9 +31502,9 @@ ${pckCertChain}`;
       }
       toBytes() {
         const { x, y } = this.toAffine();
-        const bytes = Fp.toBytes(y);
-        bytes[bytes.length - 1] |= isOdd(x) ? 128 : 0;
-        return bytes;
+        const bytes2 = Fp.toBytes(y);
+        bytes2[bytes2.length - 1] |= isOdd(x) ? 128 : 0;
+        return bytes2;
       }
       toHex() {
         return bytesToHex2(this.toBytes());
@@ -31702,11 +31703,11 @@ ${pckCertChain}`;
     const pow_p_5_8 = pow2(b250, _2n4, P) * x % P;
     return { pow_p_5_8, b2 };
   }
-  function adjustScalarBytes(bytes) {
-    bytes[0] &= 248;
-    bytes[31] &= 127;
-    bytes[31] |= 64;
-    return bytes;
+  function adjustScalarBytes(bytes2) {
+    bytes2[0] &= 248;
+    bytes2[31] &= 127;
+    bytes2[31] |= 64;
+    return bytes2;
   }
   var ED25519_SQRT_M1 = /* @__PURE__ */ BigInt("19681161376707505956807079304988542015446066515923890162744021073123829784752");
   function uvRatio(u, v) {
@@ -32001,21 +32002,21 @@ ${pckCertChain}`;
     const plaintext = await aead.Open(km.keyBytes, nonce, new Uint8Array(0), ciphertext);
     return plaintext;
   }
-  function hexToBytes3(hex2) {
-    if (hex2.length % 2 !== 0) {
+  function hexToBytes3(hex3) {
+    if (hex3.length % 2 !== 0) {
       throw new Error("Hex string must have even length");
     }
-    if (!/^[0-9a-fA-F]*$/.test(hex2)) {
+    if (!/^[0-9a-fA-F]*$/.test(hex3)) {
       throw new Error("Invalid hex character");
     }
-    const bytes = new Uint8Array(hex2.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-      bytes[i] = parseInt(hex2.substring(i * 2, i * 2 + 2), 16);
+    const bytes2 = new Uint8Array(hex3.length / 2);
+    for (let i = 0; i < bytes2.length; i++) {
+      bytes2[i] = parseInt(hex3.substring(i * 2, i * 2 + 2), 16);
     }
-    return bytes;
+    return bytes2;
   }
-  function bytesToHex3(bytes) {
-    return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  function bytesToHex3(bytes2) {
+    return Array.from(bytes2).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
   // node_modules/ehbp/dist/esm/errors.js
@@ -32405,6 +32406,44 @@ ${pckCertChain}`;
   // node_modules/ehbp/dist/esm/client.js
   var MAX_PROBLEM_DETAILS_BYTES = 64 * 1024;
 
+  // src/runtime-policy.ts
+  var validateRuntimePolicy = (value, modelId) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Missing runtime policy.");
+    const p = value;
+    if (p.status !== "active" || p.model_id !== modelId) throw new Error("No active runtime policy matches the selected model.");
+    for (const field of ["model_artifact_digest", "runtime_image_digest", "deployment_configuration_digest"]) {
+      if (!/^sha256:[0-9a-f]{64}$/.test(p[field] ?? "")) throw new Error(`Runtime policy is missing ${field}.`);
+    }
+    if (!/^sha256:[A-Za-z0-9_-]{43}$/.test(p.tls_spki_sha256 ?? "") || !p.proxy_version) throw new Error("Runtime policy is missing TLS or release pins.");
+    if (!p.tdx || typeof p.tdx !== "object") throw new Error("Runtime policy is missing TDX measurement pins.");
+    for (const field of ["mrtd", "rtmr0", "rtmr1", "rtmr2"]) {
+      if (!/^[0-9a-f]{96}$/.test(p.tdx[field] ?? "")) throw new Error(`Runtime policy is missing TDX ${field}.`);
+    }
+    for (const field of ["app_id", "compose_hash", "os_image_hash"]) {
+      if (!new RegExp(`^[0-9a-f]{${field === "app_id" ? 40 : 64}}$`).test(p.tdx[field] ?? "")) throw new Error(`Runtime policy is missing TDX ${field}.`);
+    }
+    if (!p.receipt_keys || !Object.keys(p.receipt_keys).length) throw new Error("Runtime policy is missing receipt keys.");
+    if (!Number.isInteger(p.allowed_runtime?.minimum_gpu_count) || p.allowed_runtime.minimum_gpu_count < 1 || !p.allowed_runtime.tee?.includes("intel-tdx") || !p.allowed_runtime.gpu_attestation?.includes("nvidia-cc")) throw new Error("Runtime policy has invalid hardware requirements.");
+    return p;
+  };
+  var checkWorkloadPolicy = (policy, evidence, claims, keyId) => {
+    const workload = evidence.workload;
+    if (!workload || typeof workload !== "object") throw new Error("The evidence is missing workload identity.");
+    const checks = [
+      [claims.model_digest, policy.model_artifact_digest, "model artifact digest"],
+      [workload.model_digest, policy.model_artifact_digest, "workload model digest"],
+      [workload.model_id, policy.model_id, "workload model identity"],
+      [claims.runtime_digest, policy.runtime_image_digest, "runtime digest"],
+      [workload.compose_digest, policy.deployment_configuration_digest, "deployment configuration digest"],
+      [workload.proxy_version, policy.proxy_version, "proxy release"],
+      [evidence.tls_spki_sha256, policy.tls_spki_sha256, "TLS key"]
+    ];
+    for (const [actual, expected, name] of checks) if (actual !== expected) throw new Error(`The ${name} does not match the published policy.`);
+    const pin = policy.receipt_keys[keyId];
+    const observed = evidence.receipt_pubkey_jwk;
+    if (!pin || !observed || pin.x !== observed.x || pin.y !== observed.y || pin.crv !== observed.crv) throw new Error("The attested signer does not match the published policy.");
+  };
+
   // src/verify.ts
   var textDecoder = new TextDecoder();
   var ONE_MINUTE_MS = 6e4;
@@ -32470,7 +32509,8 @@ ${pckCertChain}`;
         throw new Error("expected endpoint must equal the origin of baseURL.");
       }
       const fetchImpl = options.fetchImpl ?? fetch;
-      const nowMs = options.now?.() ?? Date.now();
+      const clock = options.now ?? Date.now;
+      const nowMs = clock();
       const nonce = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
       const attestationUrl = new URL(options.attestationUrl ?? "/attestation", endpoint);
       if (attestationUrl.protocol !== "https:" || attestationUrl.origin !== endpoint.origin) {
@@ -32489,6 +32529,13 @@ ${pckCertChain}`;
       const receipt = asNonEmptyString(payload.verification_receipt);
       if (!evidence || !receipt) throw new Error("The attestation response is missing evidence or a receipt.");
       const { claims, keyId } = await verifyReceiptSignature(receipt, options.trustedReceiptKeys);
+      let policy = options.expectedPolicy ? validateRuntimePolicy(options.expectedPolicy, options.expectedModelId) : void 0;
+      if (!policy && endpoint.origin === "https://api.adverserial.ai") {
+        const response2 = await fetchImpl("https://verify.adverserial.ai/policies/production.json", { credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(15e3) });
+        if (!response2.ok) throw new Error("The approved production policy is unavailable.");
+        policy = validateRuntimePolicy(await response2.json(), options.expectedModelId);
+      }
+      if (policy) checkWorkloadPolicy(policy, evidence, claims, keyId);
       const issuedAt = asEpochSeconds(claims.iat, "iat");
       const expiresAt = asEpochSeconds(claims.exp, "exp");
       if (expiresAt * 1e3 <= nowMs) throw new Error("The verification receipt has expired.");
@@ -32537,7 +32584,8 @@ ${pckCertChain}`;
         evidence,
         nonce,
         expectedModelId: options.expectedModelId,
-        expectedEndpoint
+        expectedEndpoint,
+        expectedTDXPolicy: policy?.tdx
       });
       if (!hardware || hardware.verified !== true || !asNonEmptyString(hardware.verifier)) {
         throw new Error("The hardware verifier did not accept the attestation evidence.");
@@ -32582,6 +32630,7 @@ ${pckCertChain}`;
           throw new Error("The evidence EHBP key configuration does not contain its quote-bound public key.");
         }
       }
+      if (expiresAt * 1e3 <= clock()) throw new Error("The verification receipt expired during hardware verification.");
       return {
         status: "verified",
         proof: {
@@ -32739,10 +32788,10 @@ ${pckCertChain}`;
   var base64url = (value) => {
     if (!/^[A-Za-z0-9_-]*$/.test(value)) throw new Error("NVIDIA EAT contains invalid base64url data.");
     const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
-    const bytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
-    return bytes;
+    const bytes2 = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+    return bytes2;
   };
-  var hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  var hex = (bytes2) => Array.from(bytes2, (byte) => byte.toString(16).padStart(2, "0")).join("");
   var parseToken = (compact) => {
     const parts = compact.split(".");
     if (parts.length !== 3 || parts.some((part) => !part)) throw new Error("NVIDIA EAT is not a compact JWS.");
@@ -32830,6 +32879,53 @@ ${pckCertChain}`;
     return { verified: true, verifier: "nras-eat-jwks-es384", gpuCount: expectedDigests.size, issuedAt: new Date(epoch(overall.claims.iat, "iat") * 1e3).toISOString(), expiresAt: new Date(epoch(overall.claims.exp, "exp") * 1e3).toISOString() };
   };
 
+  // src/tdx-workload.ts
+  var hex2 = (a) => Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+  var bytes = (s) => {
+    if (typeof s !== "string" || s.length % 2 || !/^[a-f0-9]*$/i.test(s)) throw new Error("Invalid hex in TDX runtime event.");
+    return Uint8Array.from(s.match(/../g) ?? [], (x) => parseInt(x, 16));
+  };
+  var concat2 = (...arrays) => {
+    const a = new Uint8Array(arrays.reduce((n, x) => n + x.length, 0));
+    let i = 0;
+    for (const x of arrays) {
+      a.set(x, i);
+      i += x.length;
+    }
+    return a;
+  };
+  var sha3842 = async (a) => new Uint8Array(await crypto.subtle.digest("SHA-384", asArrayBuffer(a)));
+  var verifyTDXWorkload = async (report, eventLog, policy) => {
+    if ((report.tdAttributes[0] & 1) !== 0) throw new Error("Debug-enabled TDX workloads are not accepted.");
+    const events = typeof eventLog === "string" ? JSON.parse(eventLog) : eventLog;
+    if (!Array.isArray(events) || !events.length || events.length > 4096) throw new Error("Invalid TDX event log.");
+    const lane = events.filter((e) => e && e.imr === 3);
+    if (!lane.length) throw new Error("The TDX event log has no RTMR3 events.");
+    let mr = new Uint8Array(48);
+    for (const e of lane) {
+      if (e.event_type !== 134217729 || typeof e.event !== "string" || !e.event.length || e.event.length > 256 || typeof e.event_payload !== "string") throw new Error("Unsupported TDX runtime event format.");
+      const type = new Uint8Array(4);
+      new DataView(type.buffer).setUint32(0, e.event_type, true);
+      const digest = await sha3842(concat2(type, new TextEncoder().encode(":" + e.event + ":"), bytes(e.event_payload)));
+      if (e.digest && e.digest.toLowerCase() !== hex2(digest)) throw new Error("TDX runtime event digest does not match its payload.");
+      mr = await sha3842(concat2(mr, digest));
+    }
+    if (hex2(mr) !== hex2(report.rtMr3)) throw new Error("TDX event-log replay does not match quoted RTMR3.");
+    const one = (name) => {
+      const found = lane.filter((e) => e.event === name);
+      if (found.length !== 1) throw new Error(`Missing or duplicate trusted TDX event: ${name}.`);
+      return found[0];
+    };
+    const preparing = one("system-preparing"), boot = one("boot-mr-done"), ready = one("system-ready");
+    if (lane[0] !== preparing || lane.indexOf(boot) >= lane.indexOf(ready)) throw new Error("Invalid TDX boot event ordering.");
+    for (const name of ["app-id", "compose-hash", "instance-id"]) if (lane.indexOf(one(name)) >= lane.indexOf(boot)) throw new Error(`TDX ${name} is outside the trusted boot boundary.`);
+    for (const name of ["os-image-hash", "key-provider"]) if (lane.indexOf(one(name)) >= lane.indexOf(ready)) throw new Error(`TDX ${name} is outside the trusted system boundary.`);
+    if (!policy) return;
+    const measurements = { mrtd: report.mrTd, rtmr0: report.rtMr0, rtmr1: report.rtMr1, rtmr2: report.rtMr2 };
+    for (const [name, value] of Object.entries(measurements)) if (hex2(value) !== policy[name]) throw new Error(`TDX ${name} does not match approved policy.`);
+    for (const [event, field] of [["app-id", "app_id"], ["compose-hash", "compose_hash"], ["os-image-hash", "os_image_hash"]]) if (one(event).event_payload !== policy[field]) throw new Error(`TDX ${event} does not match approved policy.`);
+  };
+
   // src/phala.ts
   var text = new TextEncoder();
   var asRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? value : null;
@@ -32853,7 +32949,7 @@ ${pckCertChain}`;
   var quoteReportData = (report) => report.asTd10()?.reportData ?? report.asTd15()?.base.reportData ?? (() => {
     throw new Error("The verified quote is not a TDX quote.");
   })();
-  var verifyPhalaTDXEvidence = async ({ evidence, nonce }, pccsURL) => {
+  var verifyPhalaTDXEvidence = async ({ evidence, nonce, expectedTDXPolicy }, pccsURL) => {
     const quoteHex = nonEmpty(evidence.tdx_quote);
     const tlsSPKI = nonEmpty(evidence.tls_spki_der);
     const receiptJWK = asRecord2(evidence.receipt_pubkey_jwk);
@@ -32878,7 +32974,10 @@ ${pckCertChain}`;
     if (!equalBytes(quoteReportData(verified.report), expected)) {
       throw new Error("The Intel TDX quote report_data does not bind this fresh evidence and encrypted receiver key.");
     }
-    return { verified: true, verifier: "@phala/dcap-qvl@0.6.5", tee: "Intel TDX" };
+    const report = verified.report.asTd10() ?? verified.report.asTd15()?.base;
+    if (!report) throw new Error("Expected TDX report.");
+    await verifyTDXWorkload(report, evidence.tdx_event_log, expectedTDXPolicy);
+    return { verified: true, verifier: "@phala/dcap-qvl@0.6.5+rtmr3-policy-v1", tee: "Intel TDX" };
   };
   var createPhalaNVIDIAVerifier = (options) => async (input) => {
     const tdx = await verifyPhalaTDXEvidence(input, options.pccsURL);

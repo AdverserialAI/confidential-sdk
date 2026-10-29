@@ -1,0 +1,119 @@
+{
+  "boot": {
+    "status": "UpToDate",
+    "rtmr3ReplayMatches": true,
+    "mrtd": "b24d3b24e9e3c16012376b52362ca09856c4adecb709d5fac33addf1c47e193da075b125b6c364115771390a5461e217",
+    "rtmr0": "d8f547a53863772b1a8b64f6b9ae70ad98549fbb44628d2f07c8ed6f883ce6288611538b27dac0eb5baa216a4154a8bd",
+    "rtmr1": "07e6f51aa763abfe75c3ddfbf4f425fe3f0ceff66d807a75e049303dce9addf68e7218729bd419638af63a370f65878c",
+    "rtmr2": "f1c82667a354194467cd8419efd14a714560dd9b85b4c13b25c11e44bf4e126248c2255fad58c303fb0ca2921765d53a",
+    "rtmr3": "054643b1fa958f9cffa9a79be96d53cc6bdec6cbb8a5b12cf5f137add902b4cec74068f0a81a4c893e7d47252513a240",
+    "tdAttributes": "0000001000000000",
+    "events": [
+      {
+        "event": "system-preparing"
+      },
+      {
+        "event": "app-id",
+        "payload": "b74e3dde6292cc69bac759b22fc723a299aa8a83"
+      },
+      {
+        "event": "compose-hash",
+        "payload": "954535cc8dbf5c1f8d36e43f776553d85f198dc07cf9cc6dd7a9dd7d3d1bdd82"
+      },
+      {
+        "event": "instance-id"
+      },
+      {
+        "event": "boot-mr-done"
+      },
+      {
+        "event": "mr-kms"
+      },
+      {
+        "event": "os-image-hash",
+        "payload": "806a352e16175d90568de97dff563f31f680239e6b90e9b5b2e9141d0955b0d9"
+      },
+      {
+        "event": "key-provider"
+      },
+      {
+        "event": "storage-fs"
+      },
+      {
+        "event": "system-ready"
+      }
+    ]
+  },
+  "events": [
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "system-preparing",
+      "event_payload": ""
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "app-id",
+      "event_payload": "b74e3dde6292cc69bac759b22fc723a299aa8a83"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "compose-hash",
+      "event_payload": "954535cc8dbf5c1f8d36e43f776553d85f198dc07cf9cc6dd7a9dd7d3d1bdd82"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "instance-id",
+      "event_payload": "3ab325a3d33ac30b0ce0bb32f8a95182deeda3a0"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "boot-mr-done",
+      "event_payload": ""
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "mr-kms",
+      "event_payload": "5039840b94d9891852228ae8d5ef8c3ad825c8ca11c18533f19fd8a4de45890c"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "os-image-hash",
+      "event_payload": "806a352e16175d90568de97dff563f31f680239e6b90e9b5b2e9141d0955b0d9"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "key-provider",
+      "event_payload": "7b226e616d65223a226b6d73222c226964223a223330353933303133303630373261383634386365336430323031303630383261383634386365336430333031303730333432303030343838343465623432636364663863353266643466313734663336326663623962626431396334356664343866316564656332643866316361323335333665633161373430323162346365653631306330373466383239346434333162326237666565326333396535333333666461663061343532326434336662313539643966227d"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "storage-fs",
+      "event_payload": "7a6673"
+    },
+    {
+      "imr": 3,
+      "event_type": 134217729,
+      "digest": "",
+      "event": "system-ready",
+      "event_payload": ""
+    }
+  ]
+}

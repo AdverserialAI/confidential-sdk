@@ -10,6 +10,7 @@ import json
 import subprocess
 import sys
 import unittest
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -135,6 +136,15 @@ class VerifyTests(unittest.TestCase):
         with FakeAttestProxy(iat_offset=-600, lifetime=300) as fake:
             with self.assertRaisesRegex(VerificationError, "expired"):
                 self.verify(fake)
+
+    def test_receipt_expiring_during_hardware_verification_rejected(self):
+        current = [time.time()]
+        def slow_verifier(*args):
+            current[0] += 600
+            return test_hardware_verifier(*args)
+        with FakeAttestProxy(lifetime=300) as fake:
+            with self.assertRaisesRegex(VerificationError, "expired during hardware"):
+                self.verify(fake, now=lambda: current[0], hardware_verifier=slow_verifier)
 
     def test_future_receipt_rejected(self):
         with FakeAttestProxy(iat_offset=3600) as fake:

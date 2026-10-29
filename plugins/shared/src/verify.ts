@@ -4,7 +4,7 @@
  * refusal state, a fetch timeout, and a 5-minute TTL cache.
  */
 
-import { toBase64Url, verifyEndpoint } from '../../../typescript/src/index.js';
+import { toBase64Url, verifyEndpoint, validateRuntimePolicy } from '../../../typescript/src/index.js';
 import type { TrustedReceiptKeys, VerifiedProof } from '../../../typescript/src/index.js';
 import type { CoreConfig } from './config.js';
 import { hardwareVerifier } from './hardware.js';
@@ -131,7 +131,19 @@ export const runVerification = async (config: CoreConfig, deps?: VerifyDeps): Pr
 		}
 	}
 
-	const result = await verifyEndpoint(config.baseURL, {
+
+  let policy;
+  if (new URL(config.baseURL).origin === 'https://api.adverserial.ai') {
+    try {
+      const response = await fetchImpl('https://verify.adverserial.ai/policies/production.json', {credentials:'omit',cache:'no-store'});
+      if (!response.ok) throw new Error(`Runtime policy returned ${response.status}.`);
+      policy = validateRuntimePolicy(await response.json(), config.modelId);
+    } catch (error) {
+      return {status:'failed',trust,reason:error instanceof Error?error.message:'Runtime policy unavailable.',verifiedAt,config:summary};
+    }
+  }
+  const result = await verifyEndpoint(config.baseURL, {
+    expectedPolicy: policy,
 		expectedModelId: config.modelId,
 		trustedReceiptKeys: keys,
 		issuer: config.issuer,
@@ -174,7 +186,7 @@ export class VerificationCache {
 
 	async get(config: CoreConfig, deps?: VerifyDeps): Promise<CacheEntry> {
 		const now = this.#now();
-		if (this.#current && now - this.#current.verifiedAt < this.#ttlMs) {
+		if (this.#current && now - this.#current.verifiedAt < this.#ttlMs && (this.#current.status !== 'verified' || this.#current.proof.expiresEpoch * 1000 > now)) {
 			return { verdict: this.#current, ageMs: now - this.#current.verifiedAt, fromCache: true };
 		}
 		this.#inflight ??= runVerification(config, deps)

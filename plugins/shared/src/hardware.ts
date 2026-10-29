@@ -8,6 +8,7 @@
  * It receives no API key, prompt, completion, or customer identity.
  */
 import { spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import type { HardwareEvidenceVerifier, HardwareVerification } from '../../../typescript/src/index.js';
 
 const MAX_OUTPUT = 64 << 10;
@@ -22,7 +23,10 @@ type CommandOutput = {
 
 const readOutput = (command: string, input: string): Promise<CommandOutput> =>
 	new Promise((resolve, reject) => {
-		const child = spawn(command, [], { shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+		const isJavaScript = /\.m?js$/.test(command);
+		const node = process.env.ADVERSERIAL_NODE_EXECUTABLE || process.execPath;
+		if (isJavaScript && !isAbsolute(node)) return reject(new Error('ADVERSERIAL_NODE_EXECUTABLE must be an absolute executable path.'));
+		const child = spawn(isJavaScript ? node : command, isJavaScript ? [command] : [], { shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
 		let stdout = '';
 		let stderr = '';
 		let exceeded = false;

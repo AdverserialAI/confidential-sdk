@@ -16,6 +16,7 @@ import { asArrayBuffer, fromBase64Url } from './canonjson.js';
 import type { HardwareEvidenceVerifier } from './verify.js';
 import type { JsonRecord } from './canonjson.js';
 import { verifyNVIDIAEvidence } from './nvidia.js';
+import { verifyTDXWorkload } from './tdx-workload.js';
 
 const text = new TextEncoder();
 
@@ -55,7 +56,7 @@ const quoteReportData = (report: { asTd10: () => { reportData: Uint8Array } | nu
  * that signed EAT bundle if your policy requires GPU-confidential proof.
  */
 export const verifyPhalaTDXEvidence = async (
-	{ evidence, nonce }: Parameters<HardwareEvidenceVerifier>[0],
+	{ evidence, nonce, expectedTDXPolicy }: Parameters<HardwareEvidenceVerifier>[0],
 	pccsURL?: string
 ) => {
 	const quoteHex = nonEmpty(evidence.tdx_quote);
@@ -85,7 +86,10 @@ export const verifyPhalaTDXEvidence = async (
 		throw new Error('The Intel TDX quote report_data does not bind this fresh evidence and encrypted receiver key.');
 	}
 
-	return { verified: true, verifier: '@phala/dcap-qvl@0.6.5', tee: 'Intel TDX' };
+	const report = verified.report.asTd10() ?? verified.report.asTd15()?.base;
+	if (!report) throw new Error('Expected TDX report.');
+	await verifyTDXWorkload(report, evidence.tdx_event_log, expectedTDXPolicy);
+	return { verified: true, verifier: '@phala/dcap-qvl@0.6.5+rtmr3-policy-v1', tee: 'Intel TDX' };
 };
 
 /**

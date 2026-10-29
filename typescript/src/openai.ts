@@ -15,10 +15,12 @@
  */
 
 import { verifyEndpoint } from './verify.js';
+import type { RuntimePolicy } from './runtime-policy.js';
 import type { HardwareEvidenceVerifier, TrustedReceiptKeys, VerifiedProof } from './verify.js';
 import { Identity, KeyConfigMismatchError, PROTOCOL } from 'ehbp';
 
 export type VerifiedOpenAIOptions = {
+	expectedPolicy?: RuntimePolicy;
 	/** Endpoint base URL, e.g. "https://host/v1". */
 	baseURL: string;
 	/** Short-lived, model-bound billing entitlement sent to the CVM. Never pass a platform API key here. */

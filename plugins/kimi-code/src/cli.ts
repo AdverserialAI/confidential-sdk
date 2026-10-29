@@ -110,18 +110,24 @@ const main = async (): Promise<number> => {
 	}
 
 	if (flags.has('--status')) {
-		const entry = loadCache();
+		let entry = loadCache();
 		if (!entry) {
 			console.log('attestation status: no cached verdict — run adverserial-verify first.');
 			return 1;
 		}
-		if (flags.has('--json')) {
-			console.log(JSON.stringify({ ...entry.verdict, ageMs: entry.ageMs }, null, 2));
+
+    const now = Date.now();
+    const v = entry.verdict;
+    const fresh = v.status === 'verified' && v.trust === 'pinned' && v.proof?.status === 'verified' && v.proof.devMode === false &&
+      typeof v.proof.expiresEpoch === 'number' && Number.isFinite(v.proof.expiresEpoch) && v.proof.expiresEpoch * 1000 > now &&
+      Number.isFinite(v.verifiedAt) && v.verifiedAt <= now + 5000 && entry.ageMs >= -5000 && entry.ageMs < CACHE_TTL_MS;
+    if (v.status === 'verified' && !fresh) entry = {...entry, verdict: {status:'failed',trust:v.trust,reason:'Cached attestation is expired, unpinned, synthetic or incomplete.',verifiedAt:v.verifiedAt,config:v.config}};
+    if (flags.has('--json')) {
+      console.log(JSON.stringify({ ...entry.verdict, ageMs: entry.ageMs }, null, 2));
 		} else {
 			console.log(formatStatus(entry, CACHE_TTL_MS));
 		}
-		const fresh = entry.ageMs < CACHE_TTL_MS;
-		return entry.verdict.status === 'verified' && fresh ? 0 : 1;
+		return fresh ? 0 : 1;
 	}
 
 	let config;

@@ -21,3 +21,6 @@ export type { InferenceReceiptProof, VerifyInferenceReceiptOptions } from './inf
 // EHBP transport support is provided by the maintained MIT-licensed `ehbp`
 // reference package from Tinfoil. Use createVerifiedOpenAI() with a verified
 // quote-bound key configuration instead of supplying a separately fetched key.
+
+export { validateRuntimePolicy } from './runtime-policy.js';
+export type { RuntimePolicy, TDXPolicy } from './runtime-policy.js';
