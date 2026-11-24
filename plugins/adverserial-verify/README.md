@@ -113,8 +113,8 @@ export ADVERSERIAL_HARDWARE_VERIFIER_COMMAND='/absolute/path/to/adverserial-hard
 ```
 
 The keys file is a JSON object mapping key id → public EC P-256 JWK. The key
-set and hardware verifier come from the signed policy published at
-`https://verify.adverserial.ai`; the shipped
+set and hardware verifier come from the policy published at
+`https://verify.adverserial.ai` (served over HTTPS; not signed); the shipped
 `typescript/bin/adverserial-hardware-verify.mjs` in this repository is the
 reference verifier. Do not substitute an untrusted URL or a shell command.
 
