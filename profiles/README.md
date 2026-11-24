@@ -1,5 +1,7 @@
 # Confidential coding-agent profiles
 
+> Out of date against production: see the note at the top of the [root README](../README.md). The maintained copy ships in [adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit).
+
 These are transport profiles for the local confidential gateway. They do not
 contain credentials and they never direct a prompt to the legacy API shim.
 Every request follows the same path:

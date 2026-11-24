@@ -1,5 +1,7 @@
 # @adverserial/sdk (TypeScript)
 
+> Out of date against production: see the note at the top of the [root README](../README.md). The maintained copy ships in [adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit).
+
 Client-side verification SDK for Adverserial confidential-inference
 endpoints. See the [root README](../README.md) for the protocol and threat
 model. DOM WebCrypto + fetch; runs in browsers and Node 18+. No runtime
@@ -9,7 +11,7 @@ dependencies; `tsc` is the only build step.
 import { verifyEndpoint, createPhalaNVIDIAVerifier, createVerifiedOpenAI } from '@adverserial/sdk';
 
 const result = await verifyEndpoint('https://host/v1', {
-	expectedModelId: 'lordx64/cyberglm',
+	expectedModelId: 'adverserial/cyberseek',
 	trustedReceiptKeys: { [kid]: jwk },
 	issuer: 'https://verify.adverserial.ai',
 	audience: 'https://chat.adverserial.ai',

@@ -1,5 +1,7 @@
 # Adverserial confidential gateway
 
+> Out of date against production: see the note at the top of the [root README](../README.md). The maintained copy ships in [adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit).
+
 A loopback-only gateway for the confidential endpoint. It accepts the native
 wire protocol used by coding agents and refuses to send a prompt unless the
 endpoint attestation, pinned receipt key, TLS SPKI, and independent TDX/GPU
@@ -27,14 +29,15 @@ export ADVERSERIAL_GPU_VERIFIER_COMMAND='/absolute/path/to/your-gpu-attestation-
 adverserial-confidential-gateway
 ```
 
-`adverserial-hardware-verify` validates protocol bindings then invokes both configured vendor adapters; it fails closed unless each validates its portion of raw evidence. The receipt keys and hardware verifier must be obtained from the signed policy
-published at `https://verify.adverserial.ai`. Do not use this gateway until the
+`adverserial-hardware-verify` validates protocol bindings then invokes both configured vendor adapters; it fails closed unless each validates its portion of raw evidence. The receipt keys and hardware verifier must be obtained from the policy
+published at `https://verify.adverserial.ai` (served over HTTPS; the policy document is not signed). Do not use this gateway until the
 policy identifies a live production endpoint and the independent verifier is
 available.
 
 Configure an OpenAI client with `base_url=http://127.0.0.1:8787/v1`, your
-normal Adverserial API key, and canonical model IDs only:
-`lordx64/cyberglm` or `lordx64/cyberkimi`.
+normal Adverserial API key, and canonical model IDs only. The gateway in this repository accepts
+`lordx64/cyberglm` or `lordx64/cyberkimi`; production serves
+`adverserial/cyberseek`, which only the kit's gateway accepts.
 
 ## Supported coding-agent protocols
 

@@ -12,5 +12,6 @@ ack init
 ack code
 ```
 
-The SDK repository remains the source for lower-level confidential inference
-components and harness integrations.
+The kit carries its own, newer copy of the gateway, libraries, plugins and
+profiles under `resources/`. The copies in this SDK repository have not been
+updated since 2026-10-29 and still target the earlier `lordx64/cyberglm` model.

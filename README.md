@@ -1,7 +1,26 @@
-# adverserial-sdk
+# Adverserial confidential SDK
+
+> **Out of date against production — use the kit for a working client.**
+> This repository was last changed on 2026-10-29. The maintained copy of the
+> gateway, the Python and TypeScript libraries, the plugins and the harness
+> profiles ships inside
+> **[adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit)**
+> (under `resources/`), which is what `ack` installs. What differs here:
+>
+> - Defaults, examples and the gateway's allow-list name `lordx64/cyberglm`
+>   and `lordx64/cyberkimi`. Production serves `adverserial/cyberseek`, which
+>   the gateway in this repository rejects as an unknown model.
+> - CI tests against an `attest-proxy` commit from October 2026. Production
+>   runs `v0.1.0-rc.33`, whose receipt, meter and EHBP keys are generated
+>   inside the confidential VM (see "Trusted receipt keys" below).
+> - No release has been tagged or published from this repository; the
+>   packages are not on npm or PyPI. Install from source.
+>
+> Nothing has been removed. The protocol description below is still the one
+> the proxy implements.
 
 Client-side verification SDK for **Adverserial confidential-inference
-endpoints** ([attest-proxy](../attest-proxy)). Verify an endpoint's
+endpoints** ([attest-proxy](https://github.com/AdverserialAI/attest-proxy)). Verify an endpoint's
 attestation, then send inference bodies with the quote-bound RFC 9180/RFC
 9458 EHBP key configuration. Two implementations, one protocol:
 
@@ -72,7 +91,7 @@ from adverserial import verify_endpoint, VerifiedSession
 
 proof = verify_endpoint(
     "https://host/v1",
-    expected_model_id="lordx64/cyberglm",
+    expected_model_id="adverserial/cyberseek",
     trusted_receipt_keys={kid: jwk},            # pinned out-of-band
     issuer="https://verify.adverserial.ai",
     audience="https://chat.adverserial.ai",
@@ -100,7 +119,7 @@ CLI:
 
 ```sh
 python -m adverserial verify https://host/v1 \
-    --model lordx64/cyberglm --keys keys.json          # exit 0 verified / 1 failed
+    --model adverserial/cyberseek --keys keys.json          # exit 0 verified / 1 failed
 python -m adverserial verify https://127.0.0.1:8443/v1 --trust-evidence-key
 #   ^ dev convenience: TOFU-pin the ephemeral key from the evidence. Loudly
 #     insecure — anyone terminating TLS can present one. Dev only.
@@ -120,7 +139,7 @@ pinned chat + streaming, substituted-cert rejection, CLI exit codes.
 import { verifyEndpoint, createVerifiedOpenAI } from '@adverserial/sdk';
 
 const result = await verifyEndpoint('https://host/v1', {
-	expectedModelId: 'lordx64/cyberglm',
+	expectedModelId: 'adverserial/cyberseek',
 	trustedReceiptKeys: { [kid]: jwk },   // pinned out-of-band
 	issuer: 'https://verify.adverserial.ai',
 	audience: 'https://chat.adverserial.ai'
@@ -131,7 +150,7 @@ const result = await verifyEndpoint('https://host/v1', {
 const client = await createVerifiedOpenAI({
 	baseURL: 'https://host/v1',
 	entitlement: '<short-lived-JWS>',
-	expectedModelId: 'lordx64/cyberglm',
+	expectedModelId: 'adverserial/cyberseek',
 	trustedReceiptKeys,
 	issuer: 'https://verify.adverserial.ai',
 	audience: 'https://chat.adverserial.ai'
@@ -164,11 +183,19 @@ SPKI pinning on the data path is a requirement, use the Python SDK's
 Production callers pin receipt verification keys out-of-band
 (`trusted_receipt_keys` / `trustedReceiptKeys`: a map of key ID → public EC
 P-256 JWK, where the ID is the JWK's RFC 7638 SHA-256 thumbprint and the JWS
-header `kid`). The attest-proxy generates its receipt key **ephemerally per
-boot** until KMS sealing lands, so today the key is published in the
-evidence as `receipt_pubkey_jwk`; bootstrapping trust from that (the CLI's
-`--trust-evidence-key`, the node test's TOFU step) is a development
-convenience, not a security boundary.
+header `kid`). The production receipt key is listed in the policy published
+at <https://verify.adverserial.ai/policies/production.json>.
+
+Where that key comes from has changed. Since `attest-proxy` `v0.1.0-rc.31` the
+receipt key is generated inside the confidential VM on first boot and kept in
+the VM's state volume; it changes only if that state is lost, and the proxy
+refuses a key supplied as configuration. Releases up to `rc.30` derived it
+from a seed the operator generated and passed in as sealed configuration. A
+development proxy (`DEV_MODE=1`) uses a key that lasts only for the process.
+
+The key is also present in the evidence as `receipt_pubkey_jwk`. Taking it
+from there without a pin (the CLI's `--trust-evidence-key`, the node test's
+TOFU step) is a development convenience, not a security boundary.
 
 ## EHBP transport
 

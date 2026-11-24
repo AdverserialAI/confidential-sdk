@@ -1,5 +1,7 @@
 # Confidential client integrations
 
+> Out of date against production: see the note at the top of the [root README](../README.md). The maintained copy ships in [adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit).
+
 These integrations verify an Adverserial confidential-inference endpoint and
 route the supported coding agents through the local receipt-verifying gateway.
 The gateway then connects directly to the attested runtime.

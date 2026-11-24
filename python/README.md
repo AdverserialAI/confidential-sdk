@@ -1,5 +1,7 @@
 # adverserial (Python)
 
+> Out of date against production: see the note at the top of the [root README](../README.md). The maintained copy ships in [adverserial-confidential-kit](https://github.com/AdverserialAI/adverserial-confidential-kit).
+
 Client-side verification SDK for Adverserial confidential-inference
 endpoints. See the [root README](../README.md) for the protocol and threat
 model. Dependencies: Python ≥ 3.10, stdlib + `cryptography` only.
@@ -9,7 +11,7 @@ from adverserial import verify_endpoint, VerifiedSession
 
 proof = verify_endpoint(
     "https://host/v1",
-    expected_model_id="lordx64/cyberglm",
+    expected_model_id="adverserial/cyberseek",
     trusted_receipt_keys={kid: jwk},
     issuer="https://verify.adverserial.ai",
     audience="https://chat.adverserial.ai",
